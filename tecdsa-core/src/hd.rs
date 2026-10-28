@@ -23,6 +23,17 @@ pub struct HdPath {
     path: Vec<u32>,
 }
 
+/// Child public key `X + δ·G` (33-byte compressed) for the compressed master key `x_pub`.
+pub fn derive_child_public_key(
+    x_pub: &[u8],
+    chain_code: [u8; 32],
+    path: Vec<u32>,
+) -> Result<[u8; 33]> {
+    let x = crate::curve::decode_point(x_pub)?;
+    let delta = HdPath::new(chain_code, path)?.delta(&x)?;
+    Ok(encode_point(&(x + ProjectivePoint::GENERATOR * delta)))
+}
+
 impl HdPath {
     /// Hardened indices cannot be derived without the private key and are rejected.
     pub fn new(chain_code: [u8; 32], path: Vec<u32>) -> Result<Self> {
@@ -91,6 +102,23 @@ mod tests {
             .step_by(2)
             .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
             .collect()
+    }
+
+    #[test]
+    fn child_public_key_matches_delta() {
+        let x = ProjectivePoint::GENERATOR * Scalar::from(5u64);
+        let chain = [3u8; 32];
+        let child = derive_child_public_key(&encode_point(&x), chain, alloc::vec![7, 9]).unwrap();
+        let delta = HdPath::new(chain, alloc::vec![7, 9])
+            .unwrap()
+            .delta(&x)
+            .unwrap();
+        assert_eq!(
+            child,
+            encode_point(&(x + ProjectivePoint::GENERATOR * delta))
+        );
+        assert!(derive_child_public_key(&encode_point(&x), chain, alloc::vec![1 << 31]).is_err());
+        assert!(derive_child_public_key(&[2u8; 5], chain, alloc::vec![1]).is_err());
     }
 
     /// BIP32 test vector 2: m → m/0 (non-hardened).
