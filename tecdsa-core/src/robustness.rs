@@ -122,18 +122,19 @@ fn mangled_signing_and_secrets_never_panic_or_verify() {
     let mut rng = ChaCha8Rng::seed_from_u64(901);
     let (c, s) = keygen(60);
     let d = [5u8; 32];
-    let (st, m1) = ServerSign0::start(&mut rng, &fx().server_view, &s, b"c", &d).unwrap();
-    let m2 = ClientSign::respond(&mut rng, &fx().setup, &c, b"c", &d, &m1).unwrap();
+    let (st, m1) = ServerSign0::start(&mut rng, &fx().server_view, &s, b"c", &d, None).unwrap();
+    let m2 = ClientSign::respond(&mut rng, &fx().setup, &c, b"c", &d, &m1, None).unwrap();
     let _ = st;
 
     for _ in 0..ROUNDS {
         let bad1 = mutate(&mut rng, &m1);
         if bad1 != m1 {
-            assert!(ClientSign::respond(&mut rng, &fx().setup, &c, b"c", &d, &bad1).is_err());
+            assert!(ClientSign::respond(&mut rng, &fx().setup, &c, b"c", &d, &bad1, None).is_err());
         }
         let bad2 = mutate(&mut rng, &m2);
         if bad2 != m2 {
-            let (st, m1b) = ServerSign0::start(&mut rng, &fx().server_view, &s, b"c", &d).unwrap();
+            let (st, m1b) =
+                ServerSign0::start(&mut rng, &fx().server_view, &s, b"c", &d, None).unwrap();
             let _ = m1b;
             assert!(
                 st.finish(&fx().server_view, fx().sk.paillier_sk(), &bad2)

@@ -15,6 +15,7 @@ use crate::{
     },
     curve::{decode_point, encode_point, encode_scalar, order, x_coord},
     error::{Error, Result},
+    hd::HdPath,
     keygen::{ClientKeyShare, canonical_uint},
     messages::{SignMsg1, SignMsg2, SignMsg3},
     params::Params,
@@ -53,17 +54,18 @@ impl ClientSign {
         client_id: &[u8],
         digest: &[u8; 32],
         msg1: &[u8],
+        hd: Option<&HdPath>,
     ) -> Result<Vec<u8>> {
         let params = setup.params();
         super::check_digest(digest)?;
         let m1 = SignMsg1::decode(msg1, params)?;
         let r2 = decode_point(&m1.r2)?;
         let y = decode_point(&m1.y)?;
-        let x1 = *share.secret();
+        let (x_pub, delta) = super::signing_key(share.public_key(), hd)?;
+        let x1 = *share.secret() + delta; // shifted client share
         if r2 * x1 != y {
             return Err(Error::VerificationFailed);
         }
-        let x_pub = *share.public_key();
         let ssid = Ssid::sign(
             setup.hash(),
             setup.server_id(),
@@ -71,6 +73,7 @@ impl ClientSign {
             &share.key_id(),
             digest,
             &encode_point(&r2),
+            &encode_point(&x_pub),
         )?;
 
         let mut ctx = Vec::with_capacity(96);
@@ -152,10 +155,12 @@ impl ClientSign {
         share: &ClientKeyShare,
         digest: &[u8; 32],
         msg3: &[u8],
+        hd: Option<&HdPath>,
     ) -> Result<Signature> {
         let m = SignMsg3::decode(msg3, params)?;
         let sig = decode_signature(&m.r, &m.s, m.recid)?;
-        ecdsa_verify(share.public_key(), digest, &sig)?;
+        let (x_sign, _) = super::signing_key(share.public_key(), hd)?;
+        ecdsa_verify(&x_sign, digest, &sig)?;
         // The recovery id must point back to the same key.
         let vk = k256::ecdsa::VerifyingKey::recover_from_prehash(
             digest,
@@ -163,7 +168,7 @@ impl ClientSign {
             sig.recovery_id()?,
         )
         .map_err(|_| Error::VerificationFailed)?;
-        if VerifyingKey::from_affine(share.public_key().to_affine()).ok() != Some(vk) {
+        if VerifyingKey::from_affine(x_sign.to_affine()).ok() != Some(vk) {
             return Err(Error::VerificationFailed);
         }
         Ok(sig)

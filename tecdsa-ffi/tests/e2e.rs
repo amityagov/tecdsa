@@ -62,7 +62,7 @@ fn keygen_and_sign_through_ffi() {
         let mut d = [0u8; 32];
         rng.fill_bytes(&mut d);
         let (st, m1) =
-            ServerSign0::start(&mut rng, &server_view, &server_share, b"client", &d).unwrap();
+            ServerSign0::start(&mut rng, &server_view, &server_share, b"client", &d, None).unwrap();
         let m2 = client_sign(
             setup.clone(),
             store.clone(),
@@ -70,16 +70,107 @@ fn keygen_and_sign_through_ffi() {
             b"client".to_vec(),
             d.to_vec(),
             m1,
+            None,
         )
         .unwrap();
         let (sig, m3) = st.finish(&server_view, sk.paillier_sk(), &m2).unwrap();
-        let out =
-            client_verify_signature(store.clone(), "w1".into(), Profile::P128, d.to_vec(), m3)
-                .unwrap();
+        let out = client_verify_signature(
+            store.clone(),
+            "w1".into(),
+            Profile::P128,
+            d.to_vec(),
+            m3,
+            None,
+        )
+        .unwrap();
         assert_eq!(out.rs, sig.to_bytes().to_vec());
         vk.verify_prehash(&d, &Signature::from_slice(&out.rs).unwrap())
             .unwrap();
     }
+    // HD: sign under a derived key through the FFI types
+    let chain = [7u8; 32];
+    let path = vec![44u32, 0, 0, 0, 3];
+    let hd_core = tecdsa_core::hd::HdPath::new(chain, path.clone()).unwrap();
+    let arg = || {
+        Some(HdPathArg {
+            chain_code: chain.to_vec(),
+            path: path.clone(),
+        })
+    };
+    let mut d = [0u8; 32];
+    rng.fill_bytes(&mut d);
+    let (st, m1) = ServerSign0::start(
+        &mut rng,
+        &server_view,
+        &server_share,
+        b"client",
+        &d,
+        Some(&hd_core),
+    )
+    .unwrap();
+    let m2 = client_sign(
+        setup.clone(),
+        store.clone(),
+        "w1".into(),
+        b"client".to_vec(),
+        d.to_vec(),
+        m1,
+        arg(),
+    )
+    .unwrap();
+    let (_, m3) = st.finish(&server_view, sk.paillier_sk(), &m2).unwrap();
+    let out = client_verify_signature(
+        store.clone(),
+        "w1".into(),
+        Profile::P128,
+        d.to_vec(),
+        m3.clone(),
+        arg(),
+    )
+    .unwrap();
+    assert!(
+        client_verify_signature(
+            store.clone(),
+            "w1".into(),
+            Profile::P128,
+            d.to_vec(),
+            m3,
+            None
+        )
+        .is_err()
+    );
+    assert_eq!(out.rs.len(), 64);
+    assert!(
+        client_sign(
+            setup.clone(),
+            store.clone(),
+            "w1".into(),
+            b"client".to_vec(),
+            d.to_vec(),
+            vec![],
+            Some(HdPathArg {
+                chain_code: vec![1; 31],
+                path: vec![1]
+            })
+        )
+        .is_err()
+    );
+    assert!(
+        client_sign(
+            setup.clone(),
+            store.clone(),
+            "w1".into(),
+            b"client".to_vec(),
+            d.to_vec(),
+            vec![],
+            Some(HdPathArg {
+                chain_code: vec![1; 32],
+                path: vec![0x8000_0000]
+            })
+        )
+        .is_err()
+    );
+
     assert!(matches!(
         client_sign(
             setup,
@@ -87,7 +178,8 @@ fn keygen_and_sign_through_ffi() {
             "w1".into(),
             b"client".to_vec(),
             vec![0; 31],
-            vec![]
+            vec![],
+            None
         ),
         Err(TecdsaError::InvalidInput)
     ));

@@ -9,6 +9,7 @@ use crate::{
     arith::sbig::{SBig, resized},
     curve::{decode_point, encode_point, encode_scalar, sbig_to_scalar, x_coord},
     error::{Error, Result},
+    hd::HdPath,
     keygen::{ServerKeyShare, canonical_uint},
     messages::{SignMsg1, SignMsg2, SignMsg3},
     paillier::PaillierSk,
@@ -30,12 +31,15 @@ impl ServerSign0 {
         share: &ServerKeyShare,
         client_id: &[u8],
         digest: &[u8; 32],
+        hd: Option<&HdPath>,
     ) -> Result<(ServerSign1, Vec<u8>)> {
         let params = *setup.params();
         super::check_digest(digest)?;
         let x2 = *share.secret();
         let x2_pub = ProjectivePoint::GENERATOR * x2;
-        let x1_pub = *share.public_key() - x2_pub;
+        let (x_sign, delta) = super::signing_key(share.public_key(), hd)?;
+        // client's (shifted) public share: X₁ + δ·G
+        let x1_pub = *share.public_key() - x2_pub + ProjectivePoint::GENERATOR * delta;
         let key_id = share.key_id();
         let mut ctx = Vec::with_capacity(64 + client_id.len());
         ctx.extend_from_slice(&key_id);
@@ -51,6 +55,7 @@ impl ServerSign0 {
             &key_id,
             digest,
             &encode_point(&r2),
+            &encode_point(&x_sign),
         )?;
         let msg = SignMsg1 {
             r2: encode_point(&r2).to_vec(),
@@ -62,7 +67,7 @@ impl ServerSign0 {
                 params,
                 ssid,
                 k2,
-                x_pub: *share.public_key(),
+                x_pub: x_sign,
                 e_bytes: share.e_bytes().to_vec(),
                 digest: *digest,
             },

@@ -77,12 +77,23 @@ impl BenchServer {
         Ok(m3)
     }
 
-    pub fn sign_msg1(&self, digest: Vec<u8>) -> Result<Vec<u8>, TecdsaError> {
+    pub fn sign_msg1(
+        &self,
+        digest: Vec<u8>,
+        hd: Option<crate::HdPathArg>,
+    ) -> Result<Vec<u8>, TecdsaError> {
+        let hd = crate::hd_from(hd)?;
         let d: [u8; 32] = digest.try_into().map_err(|_| TecdsaError::InvalidInput)?;
         let mut s = lock(&self.sessions)?;
         let share = s.share.as_ref().ok_or(TecdsaError::NotFound)?;
-        let (st, m1) =
-            ServerSign0::start(&mut UnwrapErr(SysRng), &self.view, share, &s.client_id, &d)?;
+        let (st, m1) = ServerSign0::start(
+            &mut UnwrapErr(SysRng),
+            &self.view,
+            share,
+            &s.client_id,
+            &d,
+            hd.as_ref(),
+        )?;
         s.sign = Some(st);
         Ok(m1)
     }

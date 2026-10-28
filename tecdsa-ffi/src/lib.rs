@@ -12,6 +12,7 @@ use std::{
 use getrandom::{SysRng, rand_core::UnwrapErr};
 use tecdsa_core::{
     error::Error as CoreError,
+    hd::HdPath,
     keygen::{ClientKeyShare, ClientKeygen0, Clock},
     params::{PARAMS_112, PARAMS_128, Params},
     setup::{SetupData, VerifiedSetup},
@@ -229,6 +230,24 @@ pub fn client_public_key(
     Ok(tecdsa_core::curve::encode_point(share.public_key()).to_vec())
 }
 
+/// BIP32 derivation request: chain code (32 bytes) and non-hardened child indices.
+#[derive(uniffi::Record)]
+pub struct HdPathArg {
+    pub chain_code: Vec<u8>,
+    pub path: Vec<u32>,
+}
+
+pub(crate) fn hd_from(arg: Option<HdPathArg>) -> Result<Option<HdPath>, TecdsaError> {
+    arg.map(|a| {
+        let chain: [u8; 32] = a
+            .chain_code
+            .try_into()
+            .map_err(|_| TecdsaError::InvalidInput)?;
+        Ok(HdPath::new(chain, a.path)?)
+    })
+    .transpose()
+}
+
 /// Signing, client step: `SignMsg1` in, `SignMsg2` out. Stateless; sessions run in parallel.
 #[uniffi::export]
 pub fn client_sign(
@@ -238,7 +257,9 @@ pub fn client_sign(
     client_id: Vec<u8>,
     digest: Vec<u8>,
     msg1: Vec<u8>,
+    hd: Option<HdPathArg>,
 ) -> Result<Vec<u8>, TecdsaError> {
+    let hd = hd_from(hd)?;
     let share = load_share(store, &wallet_id, setup.profile)?;
     Ok(ClientSign::respond(
         &mut rng(),
@@ -247,6 +268,7 @@ pub fn client_sign(
         &client_id,
         &digest32(&digest)?,
         &msg1,
+        hd.as_ref(),
     )?)
 }
 
@@ -266,9 +288,17 @@ pub fn client_verify_signature(
     profile: Profile,
     digest: Vec<u8>,
     msg3: Vec<u8>,
+    hd: Option<HdPathArg>,
 ) -> Result<SignatureBytes, TecdsaError> {
+    let hd = hd_from(hd)?;
     let share = load_share(store, &wallet_id, profile)?;
-    let sig = ClientSign::verify_final(&params(profile), &share, &digest32(&digest)?, &msg3)?;
+    let sig = ClientSign::verify_final(
+        &params(profile),
+        &share,
+        &digest32(&digest)?,
+        &msg3,
+        hd.as_ref(),
+    )?;
     Ok(SignatureBytes {
         rs: sig.to_bytes().to_vec(),
         recovery_id: sig.recid,

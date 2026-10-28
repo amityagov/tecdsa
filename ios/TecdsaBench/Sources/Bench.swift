@@ -101,13 +101,13 @@ func runBenchmark(_ cfg: BenchConfig, progress: @escaping (String) -> Void) thro
         progress("sign \(i + 1)/\(cfg.signatures)…")
         var digest = Data(count: 32)
         _ = digest.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
-        let (m1, t1) = try timed { try server.signMsg1(digest: digest) }
+        let (m1, t1) = try timed { try server.signMsg1(digest: digest, hd: nil) }
         let (m2, tc) = try timed {
-            try clientSign(setup: setup, store: store, walletId: wallet, clientId: clientId, digest: digest, msg1: m1)
+            try clientSign(setup: setup, store: store, walletId: wallet, clientId: clientId, digest: digest, msg1: m1, hd: nil)
         }
         let (m3, t3) = try timed { try server.signFinish(msg2: m2) }
         let (_, tv) = try timed {
-            try clientVerifySignature(store: store, walletId: wallet, profile: cfg.profile, digest: digest, msg3: m3)
+            try clientVerifySignature(store: store, walletId: wallet, profile: cfg.profile, digest: digest, msg3: m3, hd: nil)
         }
         sgS1.samples.append(t1); sgC.samples.append(tc); sgS3.samples.append(t3); sgV.samples.append(tv)
         sizeA = m1.count; sizeB = m2.count

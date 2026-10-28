@@ -44,6 +44,7 @@ fn render() -> String {
         &server_share,
         b"client-1",
         &digest,
+        None,
     )
     .unwrap();
     let sg2 = ClientSign::respond(
@@ -53,6 +54,7 @@ fn render() -> String {
         b"client-1",
         &digest,
         &sg1,
+        None,
     )
     .unwrap();
     let (sig, sg3) = st

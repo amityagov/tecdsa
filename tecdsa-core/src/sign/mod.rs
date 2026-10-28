@@ -16,6 +16,7 @@ use rand_core::CryptoRng;
 use crate::{
     curve::{decode_scalar, encode_point, encode_scalar},
     error::{Error, Result},
+    hd::HdPath,
     params::Params,
     ssid::Ssid,
     transcript::Transcript,
@@ -66,6 +67,21 @@ pub(crate) fn check_digest(digest: &[u8; 32]) -> Result<()> {
         return Err(Error::InvalidEncoding);
     }
     Ok(())
+}
+
+/// The key a signature is made under and the client-share shift: `(X + δ·G, δ)` for an HD
+/// path, `(X, 0)` without one.
+pub(crate) fn signing_key(
+    x_pub: &ProjectivePoint,
+    hd: Option<&HdPath>,
+) -> Result<(ProjectivePoint, Scalar)> {
+    match hd {
+        None => Ok((*x_pub, Scalar::ZERO)),
+        Some(h) => {
+            let delta = h.delta(x_pub)?;
+            Ok((*x_pub + ProjectivePoint::GENERATOR * delta, delta))
+        }
+    }
 }
 
 /// Base transcript of a signing session for `role` (`"S"` or `"C"`).
@@ -160,6 +176,7 @@ pub(crate) fn decode_signature(r: &[u8], s: &[u8], recid: u8) -> Result<Signatur
 mod tests {
     extern crate std;
     use super::*;
+    use crate::hd::HdPath;
     use crate::{
         keygen::{ClientKeyShare, ServerKeyShare},
         testutil::{fx, keygen, params},
@@ -176,8 +193,9 @@ mod tests {
         s: &ServerKeyShare,
         digest: &[u8; 32],
     ) -> (Signature, Vec<u8>) {
-        let (s1, m1) = ServerSign0::start(rng, &fx().server_view, s, b"client-1", digest).unwrap();
-        let m2 = ClientSign::respond(rng, &fx().setup, c, b"client-1", digest, &m1).unwrap();
+        let (s1, m1) =
+            ServerSign0::start(rng, &fx().server_view, s, b"client-1", digest, None).unwrap();
+        let m2 = ClientSign::respond(rng, &fx().setup, c, b"client-1", digest, &m1, None).unwrap();
         s1.finish(&fx().server_view, fx().sk.paillier_sk(), &m2)
             .unwrap()
     }
@@ -211,7 +229,7 @@ mod tests {
             assert_eq!(rec, vk);
             // the client accepts the server's SignMsg3
             assert_eq!(
-                ClientSign::verify_final(&params(), &c, &d, &m3).unwrap(),
+                ClientSign::verify_final(&params(), &c, &d, &m3, None).unwrap(),
                 sig
             );
             parities.insert(sig.recid & 1);
@@ -235,17 +253,19 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(3);
         let d = digest(&mut rng);
         let (s1, m1) =
-            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d).unwrap();
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d, None).unwrap();
 
         for i in [4usize, 10, 30, 36, 50, m1.len() - 1] {
             let mut bad = m1.clone();
             bad[i] ^= 1;
             assert!(
-                ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &bad).is_err(),
+                ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &bad, None)
+                    .is_err(),
                 "msg1 flip {i}"
             );
         }
-        let m2 = ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &m1).unwrap();
+        let m2 =
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &m1, None).unwrap();
         let positions = [
             4usize,
             20,
@@ -290,8 +310,9 @@ mod tests {
 
         // client signs another digest than the server expects
         let (s1, m1) =
-            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1).unwrap();
-        let m2 = ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d2, &m1).unwrap();
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1, None).unwrap();
+        let m2 =
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d2, &m1, None).unwrap();
         assert!(
             s1.finish(&fx().server_view, fx().sk.paillier_sk(), &m2)
                 .is_err()
@@ -299,8 +320,9 @@ mod tests {
 
         // client with another id
         let (s1, m1) =
-            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1).unwrap();
-        let m2 = ClientSign::respond(&mut rng, &fx().setup, &c, b"client-X", &d1, &m1).unwrap();
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1, None).unwrap();
+        let m2 =
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-X", &d1, &m1, None).unwrap();
         assert!(
             s1.finish(&fx().server_view, fx().sk.paillier_sk(), &m2)
                 .is_err()
@@ -308,10 +330,11 @@ mod tests {
 
         // SignMsg2 of an earlier session
         let (_, m1a) =
-            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1).unwrap();
-        let m2a = ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d1, &m1a).unwrap();
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1, None).unwrap();
+        let m2a =
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d1, &m1a, None).unwrap();
         let (s1b, _) =
-            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1).unwrap();
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1, None).unwrap();
         assert!(
             s1b.finish(&fx().server_view, fx().sk.paillier_sk(), &m2a)
                 .is_err()
@@ -319,9 +342,92 @@ mod tests {
 
         // a client holding another key rejects the server's SignMsg1 (Y ≠ R₂^{x₁})
         let (_, m1) =
-            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1).unwrap();
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d1, None).unwrap();
         assert!(
-            ClientSign::respond(&mut rng, &fx().setup, &c_other, b"client-1", &d1, &m1).is_err()
+            ClientSign::respond(&mut rng, &fx().setup, &c_other, b"client-1", &d1, &m1, None)
+                .is_err()
+        );
+    }
+
+    fn hd(chain: u8, path: &[u32]) -> HdPath {
+        HdPath::new([chain; 32], path.to_vec()).unwrap()
+    }
+
+    #[test]
+    fn hd_signatures_verify_under_the_derived_key_only() {
+        let (c, s) = keygen(28);
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
+        let x = VerifyingKey::from_affine(c.public_key().to_affine()).unwrap();
+        for path in [
+            hd(1, &[0]),
+            hd(2, &[44, 0, 0, 0, 7]),
+            hd(3, &[5, 6, 1_000_000]),
+        ] {
+            let d = digest(&mut rng);
+            let (st, m1) = ServerSign0::start(
+                &mut rng,
+                &fx().server_view,
+                &s,
+                b"client-1",
+                &d,
+                Some(&path),
+            )
+            .unwrap();
+            let m2 =
+                ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &m1, Some(&path))
+                    .unwrap();
+            let (sig, m3) = st
+                .finish(&fx().server_view, fx().sk.paillier_sk(), &m2)
+                .unwrap();
+
+            let derived = path.delta(c.public_key()).unwrap();
+            let derived_pk = VerifyingKey::from_affine(
+                (*c.public_key() + ProjectivePoint::GENERATOR * derived).to_affine(),
+            )
+            .unwrap();
+            let ecdsa = sig.to_ecdsa().unwrap();
+            derived_pk.verify_prehash(&d, &ecdsa).unwrap();
+            assert!(
+                x.verify_prehash(&d, &ecdsa).is_err(),
+                "must not verify under the master key"
+            );
+            let rec =
+                VerifyingKey::recover_from_prehash(&d, &ecdsa, sig.recovery_id().unwrap()).unwrap();
+            assert_eq!(rec, derived_pk);
+            assert_eq!(
+                ClientSign::verify_final(&params(), &c, &d, &m3, Some(&path)).unwrap(),
+                sig
+            );
+            assert!(ClientSign::verify_final(&params(), &c, &d, &m3, None).is_err());
+        }
+    }
+
+    #[test]
+    fn hd_paths_must_agree() {
+        let (c, s) = keygen(29);
+        let mut rng = ChaCha8Rng::seed_from_u64(8);
+        let d = digest(&mut rng);
+        let p = hd(1, &[1, 2]);
+        let (_, m1) =
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d, Some(&p)).unwrap();
+        // other path, other chain code, or none at all: the client rejects SignMsg1 (Y ≠ R₂^{x₁'})
+        for other in [Some(hd(1, &[2, 1])), Some(hd(9, &[1, 2])), None] {
+            let r = ClientSign::respond(
+                &mut rng,
+                &fx().setup,
+                &c,
+                b"client-1",
+                &d,
+                &m1,
+                other.as_ref(),
+            );
+            assert!(r.is_err());
+        }
+        // and the other way round
+        let (_, m1) =
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d, None).unwrap();
+        assert!(
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &m1, Some(&p)).is_err()
         );
     }
 
@@ -330,16 +436,23 @@ mod tests {
         let (c, s) = keygen(27);
         let mut rng = ChaCha8Rng::seed_from_u64(6);
         let zero = [0u8; 32];
-        assert!(ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &zero).is_err());
+        assert!(
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &zero, None).is_err()
+        );
         // digest equal to the group order reduces to zero as well
         let order = crate::curve::order();
         let mut n = [0u8; 32];
         let bytes = order.to_be_bytes();
         n.copy_from_slice(&bytes[bytes.len() - 32..]);
-        assert!(ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &n).is_err());
+        assert!(
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &n, None).is_err()
+        );
         let d = digest(&mut rng);
-        let (_, m1) = ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d).unwrap();
-        assert!(ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &zero, &m1).is_err());
+        let (_, m1) =
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d, None).unwrap();
+        assert!(
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &zero, &m1, None).is_err()
+        );
     }
 
     #[test]
@@ -349,11 +462,11 @@ mod tests {
         let d = digest(&mut rng);
         let (sig, m3) = sign_once(&mut rng, &c, &s, &d);
         let p = params();
-        assert!(ClientSign::verify_final(&p, &c, &digest(&mut rng), &m3).is_err());
+        assert!(ClientSign::verify_final(&p, &c, &digest(&mut rng), &m3, None).is_err());
         let mut bad = m3.clone();
         let n = bad.len();
         bad[n - 5] ^= 1; // inside s
-        assert!(ClientSign::verify_final(&p, &c, &d, &bad).is_err());
+        assert!(ClientSign::verify_final(&p, &c, &d, &bad, None).is_err());
         let wrong_recid = crate::messages::SignMsg3 {
             r: encode_scalar(&sig.r).to_vec(),
             s: encode_scalar(&sig.s).to_vec(),
@@ -361,7 +474,7 @@ mod tests {
         }
         .encode(&p)
         .unwrap();
-        assert!(ClientSign::verify_final(&p, &c, &d, &wrong_recid).is_err());
+        assert!(ClientSign::verify_final(&p, &c, &d, &wrong_recid, None).is_err());
     }
 
     #[test]
@@ -417,11 +530,12 @@ mod tests {
             let d = digest(&mut rng);
             let t = Instant::now();
             let (st, m1) =
-                ServerSign0::start(&mut rng, &server_view, &s_share, b"client", &d).unwrap();
+                ServerSign0::start(&mut rng, &server_view, &s_share, b"client", &d, None).unwrap();
             ts1.push(t.elapsed());
             let t = Instant::now();
             let m2 =
-                ClientSign::respond(&mut rng, &client_view, &c_share, b"client", &d, &m1).unwrap();
+                ClientSign::respond(&mut rng, &client_view, &c_share, b"client", &d, &m1, None)
+                    .unwrap();
             tc.push(t.elapsed());
             size2 = m2.len();
             let t = Instant::now();

@@ -12,6 +12,7 @@ pub mod arith;
 pub mod curve;
 pub mod df;
 pub mod error;
+pub mod hd;
 pub mod keygen;
 pub mod messages;
 pub mod paillier;

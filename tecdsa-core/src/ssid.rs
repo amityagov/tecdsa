@@ -59,7 +59,8 @@ impl Ssid {
         )
     }
 
-    /// Sign: `key_id = SHA-256(X ‖ E)`, `digest = m`, and the fresh `R₂` as the session id.
+    /// Sign: `key_id = SHA-256(X ‖ E)`, `digest = m`, the fresh `R₂` as the session id and the key
+    /// the signature is made under (`X`, or the HD-derived `X + δ·G`).
     pub fn sign(
         sid: [u8; 32],
         server_id: &[u8],
@@ -67,11 +68,13 @@ impl Ssid {
         key_id: &[u8; 32],
         digest: &[u8; 32],
         r2: &[u8; 33],
+        signing_key: &[u8; 33],
     ) -> Result<Self> {
-        let mut tail = Vec::with_capacity(32 + 32 + 33);
+        let mut tail = Vec::with_capacity(32 + 32 + 33 + 33);
         tail.extend_from_slice(key_id);
         tail.extend_from_slice(digest);
         tail.extend_from_slice(r2);
+        tail.extend_from_slice(signing_key);
         Self::new(sid, server_id, client_id, SessionKind::Sign, tail)
     }
 
