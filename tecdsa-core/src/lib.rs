@@ -15,6 +15,8 @@ pub mod error;
 pub mod paillier;
 pub mod params;
 pub mod rsa;
+pub mod transcript;
+pub mod zk;
 
 /// Wire protocol version, written into every message envelope.
 pub const PROTOCOL_VERSION: u16 = 1;

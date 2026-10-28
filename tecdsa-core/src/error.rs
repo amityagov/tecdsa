@@ -11,6 +11,8 @@ pub enum Error {
     InvalidEncoding,
     #[error("invalid modulus")]
     InvalidModulus,
+    #[error("verification failed")]
+    VerificationFailed,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
