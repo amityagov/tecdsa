@@ -18,7 +18,7 @@ struct BenchView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
-                Stepper("Keygens: \(keygens)", value: $keygens, in: 1...100)
+                Stepper("Keygens: \(keygens)", value: $keygens, in: 1...1000)
                 Stepper("Signatures: \(signatures)", value: $signatures, in: 1...1000, step: 10)
                 Toggle("112-bit profile", isOn: $profile112)
                 Button(running ? "Running…" : "Run benchmark", action: run)
@@ -38,7 +38,13 @@ struct BenchView: View {
             .padding(.horizontal, 16)
             .navigationTitle("tecdsa bench")
             .onAppear {
-                if CommandLine.arguments.contains("-autorun"), !running { runBenchmarkAsync() }
+                if CommandLine.arguments.contains("-autorun"), !running {
+                    // `-keygens N -signatures N` launch arguments arrive through UserDefaults.
+                    let d = UserDefaults.standard
+                    if d.integer(forKey: "keygens") > 0 { keygens = d.integer(forKey: "keygens") }
+                    if d.integer(forKey: "signatures") > 0 { signatures = d.integer(forKey: "signatures") }
+                    runBenchmarkAsync()
+                }
             }
         }
     }
