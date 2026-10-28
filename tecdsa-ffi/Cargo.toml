@@ -28,3 +28,5 @@ required-features = ["bindgen"]
 
 [features]
 bindgen = ["uniffi/cli"]
+# In-process server for the iPhone benchmark app; never ship it in a product build.
+bench-server = []

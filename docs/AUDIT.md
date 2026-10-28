@@ -66,8 +66,29 @@
 
 ## Fuzzing
 
-`fuzz/` — три цели libFuzzer: `messages`, `setup_and_secrets`, `zk_decoders` (только разбор).
-`cargo-fuzz` в среде разработки не установлен; цели собираются на nightly и прогонялись
-по 40 с без инструментирования покрытия (≈1,6·10^8 запусков у двух быстрых целей, без падений) —
-это слабая проверка. **Требование ТЗ «24 часа с покрытием» не выполнено**: запуск
-`cargo install cargo-fuzz && cargo +nightly fuzz run <target> -- -max_total_time=86400` остаётся за вами.
+`fuzz/` — три цели libFuzzer, только разбор входов: `messages` (все сообщения, точки, скаляры),
+`setup_and_secrets` (`SetupData::from_bytes`, импорт долей), `zk_decoders` (`dlog`, `df_star`, `dlenc`, `sig`).
+Крейт `fuzz/` вне workspace и собирается на nightly.
+
+Установка и запуск (из корня репозитория):
+
+```sh
+cargo install cargo-fuzz
+rustup toolchain install nightly          # если ещё нет
+cd fuzz
+cargo +nightly fuzz list                  # messages, setup_and_secrets, zk_decoders
+cargo +nightly fuzz run messages          # до остановки Ctrl-C
+cargo +nightly fuzz run messages -- -max_total_time=86400    # 24 часа (требование ТЗ)
+cargo +nightly fuzz run setup_and_secrets -- -max_total_time=86400 -max_len=70000
+cargo +nightly fuzz run zk_decoders -- -max_total_time=86400 -max_len=70000
+```
+
+Три цели удобно гонять параллельно (по одной на ядро; `-jobs=N -workers=N` — несколько процессов на цель).
+Корпус лежит в `fuzz/corpus/<цель>/` (в git не коммитится), падения — в `fuzz/artifacts/<цель>/`.
+Воспроизвести падение: `cargo +nightly fuzz run <цель> fuzz/artifacts/<цель>/<файл>`;
+минимизировать: `cargo +nightly fuzz tmin <цель> <файл>`; покрытие: `cargo +nightly fuzz coverage <цель>`.
+Хороший стартовый корпус — реальные сообщения протокола: их можно сохранить из тестов
+(`robustness.rs`) в `fuzz/corpus/messages/`. Критерий прохождения: 24 ч на каждую цель без падений и таймаутов.
+
+Статус: **24 часа с покрытием не прогонялись.** Ранее цели запускались по 40 с без инструментирования
+покрытия (это почти случайный ввод и слабая проверка); падений не было.

@@ -22,6 +22,11 @@ use zeroize::Zeroizing;
 
 uniffi::setup_scaffolding!();
 
+#[cfg(feature = "bench-server")]
+mod bench_server;
+#[cfg(feature = "bench-server")]
+pub use bench_server::BenchServer;
+
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum TecdsaError {
     #[error("verification failed")]
