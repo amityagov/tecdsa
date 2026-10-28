@@ -1,0 +1,33 @@
+[package]
+name = "tecdsa-core"
+description = "2PC ECDSA at the cost of 1 OLE: core math and protocols"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+std = ["thiserror/std", "serde/std", "postcard/use-std"]
+# Source of OS randomness (and `rand_core::OsRng`); needs `std`-capable target.
+getrandom = ["dep:getrandom"]
+# Variable-time backend for public-data operations on the server.
+vartime-dashu = ["std", "dep:dashu-int"]
+
+[dependencies]
+k256.workspace = true
+crypto-bigint.workspace = true
+crypto-primes.workspace = true
+sha2.workspace = true
+rand_core.workspace = true
+zeroize.workspace = true
+subtle.workspace = true
+serde.workspace = true
+postcard.workspace = true
+thiserror.workspace = true
+getrandom = { workspace = true, optional = true }
+dashu-int = { version = "0.4", optional = true }
+
+[dev-dependencies]
+rand_chacha.workspace = true

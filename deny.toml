@@ -1,0 +1,45 @@
+# cargo-deny 0.18 configuration (schema version 2 for [advisories] and [licenses]).
+# Run: cargo deny check licenses bans sources advisories
+
+[advisories]
+version = 2
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+]
+
+# Per-crate license exceptions. Stage 5 (UniFFI bindings) will need MPL-2.0 for
+# the uniffi* crates; enable the block below only then.
+# [[licenses.exceptions]]
+# crate = "uniffi*"
+# allow = ["MPL-2.0"]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+deny = [
+    { crate = "rug" },
+    { crate = "gmp-mpfr-sys" },
+    { crate = "openssl" },
+    { crate = "openssl-sys" },
+    { crate = "ring" },
+    { crate = "malachite" },
+    { crate = "native-tls" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
