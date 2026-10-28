@@ -21,6 +21,7 @@ struct BenchConfig {
     var profile: Profile = .p128
     var keygens = 10
     var signatures = 50
+    var hdSignatures = 50
 }
 
 struct BenchReport {
@@ -116,6 +117,30 @@ func runBenchmark(_ cfg: BenchConfig, progress: @escaping (String) -> Void) thro
     report.lines.append(line(sgS1) + String(format: "; SignMsg1 %d B", sizeA))
     report.lines.append(line(sgS3))
     report.lines.append(line(sgV))
+    // HD signing: BIP44-like path m/44/0/0/0/i (non-hardened), signature must verify under the
+    // derived key and must NOT verify as a plain signature.
+    if cfg.hdSignatures > 0 {
+        var hdC = Stat(name: "sign (HD) client step"), hdS3 = Stat(name: "sign (HD) server step 3")
+        let chain = Data((0..<32).map { UInt8($0 &* 7 &+ 1) })
+        for i in 0..<cfg.hdSignatures {
+            progress("sign HD \(i + 1)/\(cfg.hdSignatures)…")
+            var digest = Data(count: 32)
+            _ = digest.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
+            let hd = HdPathArg(chainCode: chain, path: [44, 0, 0, 0, UInt32(i)])
+            let m1 = try server.signMsg1(digest: digest, hd: hd)
+            let (m2, tc) = try timed {
+                try clientSign(setup: setup, store: store, walletId: wallet, clientId: clientId, digest: digest, msg1: m1, hd: hd)
+            }
+            let (m3, t3) = try timed { try server.signFinish(msg2: m2) }
+            _ = try clientVerifySignature(store: store, walletId: wallet, profile: cfg.profile, digest: digest, msg3: m3, hd: hd)
+            if (try? clientVerifySignature(store: store, walletId: wallet, profile: cfg.profile, digest: digest, msg3: m3, hd: nil)) != nil {
+                throw TecdsaError.Verification   // a derived-key signature must not pass as a master-key one
+            }
+            hdC.samples.append(tc); hdS3.samples.append(t3)
+        }
+        report.lines.append(line(hdC) + "; every signature verified under X + δ·G")
+        report.lines.append(line(hdS3))
+    }
     report.lines.append("thermal state at the end: \(thermal())")
     try? store.delete(key: "tecdsa/client-share/\(wallet)")
     return report

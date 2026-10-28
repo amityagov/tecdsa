@@ -13,6 +13,7 @@ struct BenchView: View {
     @State private var output = ""
     @State private var keygens = 10
     @State private var signatures = 50
+    @State private var hdSignatures = 50
     @State private var profile112 = false
 
     var body: some View {
@@ -20,6 +21,7 @@ struct BenchView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Stepper("Keygens: \(keygens)", value: $keygens, in: 1...1000)
                 Stepper("Signatures: \(signatures)", value: $signatures, in: 1...1000, step: 10)
+                Stepper("HD signatures: \(hdSignatures)", value: $hdSignatures, in: 0...1000, step: 10)
                 Toggle("112-bit profile", isOn: $profile112)
                 Button(running ? "Running…" : "Run benchmark", action: run)
                     .buttonStyle(.borderedProminent)
@@ -43,6 +45,7 @@ struct BenchView: View {
                     let d = UserDefaults.standard
                     if d.integer(forKey: "keygens") > 0 { keygens = d.integer(forKey: "keygens") }
                     if d.integer(forKey: "signatures") > 0 { signatures = d.integer(forKey: "signatures") }
+                    if d.object(forKey: "hdSignatures") != nil { hdSignatures = d.integer(forKey: "hdSignatures") }
                     runBenchmarkAsync()
                 }
             }
@@ -57,7 +60,7 @@ struct BenchView: View {
     private func runBenchmarkAsync() {
         running = true
         output = ""
-        let cfg = BenchConfig(profile: profile112 ? .p112 : .p128, keygens: keygens, signatures: signatures)
+        let cfg = BenchConfig(profile: profile112 ? .p112 : .p128, keygens: keygens, signatures: signatures, hdSignatures: hdSignatures)
         // Run off the main thread; the heavy calls are synchronous.
         Task.detached(priority: .userInitiated) {
             do {
