@@ -13,6 +13,16 @@ pub enum Error {
     InvalidModulus,
     #[error("verification failed")]
     VerificationFailed,
+    #[error("parameter sampling failed")]
+    Sampling,
+    #[error("session timed out")]
+    Timeout,
+}
+
+impl From<crate::rsa::tough::ToughError> for Error {
+    fn from(_: crate::rsa::tough::ToughError) -> Self {
+        Self::Sampling
+    }
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

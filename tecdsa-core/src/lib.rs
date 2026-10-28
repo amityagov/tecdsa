@@ -12,9 +12,13 @@ pub mod arith;
 pub mod curve;
 pub mod df;
 pub mod error;
+pub mod keygen;
+pub mod messages;
 pub mod paillier;
 pub mod params;
 pub mod rsa;
+pub mod setup;
+pub mod ssid;
 pub mod transcript;
 pub mod zk;
 

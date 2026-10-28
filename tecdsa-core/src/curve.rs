@@ -87,3 +87,18 @@ pub fn random_nonzero_scalar<R: k256::elliptic_curve::rand_core::TryRng + ?Sized
 pub fn is_identity(p: &ProjectivePoint) -> bool {
     bool::from(p.is_identity())
 }
+
+/// The group order `q` as an integer.
+pub fn order() -> crypto_bigint::BoxedUint {
+    use k256::elliptic_curve::Curve;
+    let be = <Secp256k1 as Curve>::ORDER.to_be_bytes();
+    crypto_bigint::BoxedUint::from_be_slice_vartime(be.as_ref())
+}
+
+/// Reduces a signed integer modulo `q` (constant-time in the value).
+pub fn sbig_to_scalar(x: &crate::arith::sbig::SBig) -> Result<Scalar> {
+    let q = Option::<crypto_bigint::NonZero<crypto_bigint::BoxedUint>>::from(order().to_nz())
+        .ok_or(Error::InvalidModulus)?;
+    let r = x.rem_euclid(&q);
+    decode_scalar(&crate::transcript::uint_to_be(&r, 32)?)
+}
