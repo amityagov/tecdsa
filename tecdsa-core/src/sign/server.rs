@@ -32,6 +32,7 @@ impl ServerSign0 {
         digest: &[u8; 32],
     ) -> Result<(ServerSign1, Vec<u8>)> {
         let params = *setup.params();
+        super::check_digest(digest)?;
         let x2 = *share.secret();
         let x2_pub = ProjectivePoint::GENERATOR * x2;
         let x1_pub = *share.public_key() - x2_pub;

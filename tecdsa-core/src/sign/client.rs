@@ -55,6 +55,7 @@ impl ClientSign {
         msg1: &[u8],
     ) -> Result<Vec<u8>> {
         let params = setup.params();
+        super::check_digest(digest)?;
         let m1 = SignMsg1::decode(msg1, params)?;
         let r2 = decode_point(&m1.r2)?;
         let y = decode_point(&m1.y)?;

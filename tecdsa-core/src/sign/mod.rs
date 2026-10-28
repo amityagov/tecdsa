@@ -59,6 +59,15 @@ pub(crate) fn digest_scalar(digest: &[u8; 32]) -> Scalar {
     <Scalar as Reduce<U256>>::reduce(&U256::from_be_slice(digest))
 }
 
+/// Rejects a digest that reduces to zero mod `q`. The reference implementation requires this
+/// (its comments cite Claim 7.15 of the BAM paper); the claim itself was not re-checked here.
+pub(crate) fn check_digest(digest: &[u8; 32]) -> Result<()> {
+    if bool::from(k256::elliptic_curve::Field::is_zero(&digest_scalar(digest))) {
+        return Err(Error::InvalidEncoding);
+    }
+    Ok(())
+}
+
 /// Base transcript of a signing session for `role` (`"S"` or `"C"`).
 pub(crate) fn tx_base(params: &Params, ssid: &Ssid, role: &str) -> Transcript {
     let mut t = Transcript::new("sign");
@@ -314,6 +323,23 @@ mod tests {
         assert!(
             ClientSign::respond(&mut rng, &fx().setup, &c_other, b"client-1", &d1, &m1).is_err()
         );
+    }
+
+    #[test]
+    fn zero_digest_is_rejected_by_both_sides() {
+        let (c, s) = keygen(27);
+        let mut rng = ChaCha8Rng::seed_from_u64(6);
+        let zero = [0u8; 32];
+        assert!(ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &zero).is_err());
+        // digest equal to the group order reduces to zero as well
+        let order = crate::curve::order();
+        let mut n = [0u8; 32];
+        let bytes = order.to_be_bytes();
+        n.copy_from_slice(&bytes[bytes.len() - 32..]);
+        assert!(ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &n).is_err());
+        let d = digest(&mut rng);
+        let (_, m1) = ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d).unwrap();
+        assert!(ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &zero, &m1).is_err());
     }
 
     #[test]
