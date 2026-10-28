@@ -119,12 +119,16 @@
 
 ## Этап 5. iOS и FFI
 
-- [ ] `tecdsa-ffi` на `uniffi`, трейт `SecretStore`, скрипт сборки XCFramework.
-- [ ] Release-профиль: LTO fat, `codegen-units = 1`, `panic = "abort"`. Размер библиотеки ≤ 3 МБ.
-- [ ] Тест `getrandom` на симуляторе.
-- [ ] Тестовое приложение, бенчмарки на iPhone 13+.
+- [x] `tecdsa-ffi` на `uniffi` 0.32 (MPL-2.0, исключения в `deny.toml` только для crate'ов `uniffi*`), трейт `SecretStore` (foreign), `scripts/build-xcframework.sh` (устройство + симулятор, Swift-биндинги).
+- [x] Release-профиль: LTO fat, `codegen-units = 1`, `panic = "abort"`, `strip`. Размер: cdylib 0,8 МиБ (в приложение линкуется только достижимый код; `.a` 24 МБ до линковки), цель ≤ 3 МБ выполнена.
+- [x] Тест `getrandom`: источник — `SysRng` (на iOS `getentropy`/`SecRandomCopyBytes` через getrandom 0.4), на хосте сквозной тест проходит; запуск именно на симуляторе не делался.
+- [ ] Тестовое приложение и бенчмарки на iPhone 13+ — нужен физический телефон, не выполнено.
 
-**Гейт:** шаг клиента при подписи ≤ 150 мс, keygen ≤ 3 с (p99).
+Что сделано: API клиента (`ClientSetup::verify`, `ClientKeygen`, `client_sign`, `client_verify_signature`, `client_public_key`); доля клиента никогда не пересекает границу FFI — сохраняется в `SecretStore` внутри крейта; сессия keygen одноразовая (`SessionConsumed`). Swift-файл проходит `swiftc -typecheck` под iOS-симулятор. Сквозной тест в Rust (сервер на ядре, клиент через FFI-API, полный размер, 3 подписи) проходит за 2,4 с. В `tecdsa-core` добавлены `store.rs` (`SecretStore`, `save/load` долей) и `Error::{NotFound, Storage}`. CI собирает `tecdsa-ffi` под три iOS-таргета.
+
+Замеры на хосте (Apple M): шаг клиента при подписи 33,6 мс, keygen клиента ≈ 130 мс, проверка setup 0,68 с. Ориентир для iPhone — коэффициент 1,5–3× к M-серии; точные цифры нужно снять на устройстве.
+
+**Гейт:** шаг клиента ≤ 150 мс, keygen ≤ 3 с (p99) — на хосте выполнен с большим запасом, на iPhone не измерен.
 
 ## Этап 6. Укрепление
 

@@ -20,6 +20,7 @@ pub mod rsa;
 pub mod setup;
 pub mod sign;
 pub mod ssid;
+pub mod store;
 pub mod transcript;
 pub mod zk;
 

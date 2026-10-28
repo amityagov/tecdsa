@@ -71,7 +71,7 @@ jobs:
       - name: Build for iOS
         run: |
           for target in aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios; do
-            cargo build -p tecdsa-core --target "$target"
+            cargo build -p tecdsa-core -p tecdsa-ffi --target "$target"
           done
       - name: Duplicate RustCrypto versions
         run: |

@@ -19,11 +19,30 @@ allow = [
     "Zlib",
 ]
 
-# Per-crate license exceptions. Stage 5 (UniFFI bindings) will need MPL-2.0 for
-# the uniffi* crates; enable the block below only then.
-# [[licenses.exceptions]]
-# crate = "uniffi*"
-# allow = ["MPL-2.0"]
+# Per-crate license exceptions: UniFFI (bindings layer only, never in tecdsa-core) is MPL-2.0.
+[[licenses.exceptions]]
+crate = "uniffi"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "uniffi_core"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "uniffi_internal_macros"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "uniffi_macros"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "uniffi_meta"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "uniffi_pipeline"
+allow = ["MPL-2.0"]
 
 [bans]
 multiple-versions = "warn"

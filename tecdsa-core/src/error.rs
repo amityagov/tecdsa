@@ -17,6 +17,10 @@ pub enum Error {
     Sampling,
     #[error("session timed out")]
     Timeout,
+    #[error("secret not found")]
+    NotFound,
+    #[error("secret store failure")]
+    Storage,
 }
 
 impl From<crate::rsa::tough::ToughError> for Error {
