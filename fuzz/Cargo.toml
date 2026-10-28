@@ -1,0 +1,32 @@
+[package]
+name = "tecdsa-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+tecdsa-core = { path = "../tecdsa-core", features = ["std"] }
+
+[workspace]
+
+[[bin]]
+name = "messages"
+path = "fuzz_targets/messages.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "setup_and_secrets"
+path = "fuzz_targets/setup_and_secrets.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "zk_decoders"
+path = "fuzz_targets/zk_decoders.rs"
+test = false
+doc = false

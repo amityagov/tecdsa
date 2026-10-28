@@ -29,3 +29,9 @@ pub const PROTOCOL_VERSION: u16 = 1;
 
 #[cfg(test)]
 pub(crate) mod testutil;
+
+#[cfg(test)]
+mod robustness;
+
+#[cfg(test)]
+mod vectors;
