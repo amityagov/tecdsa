@@ -107,6 +107,20 @@ fn key_id(x_pub: &ProjectivePoint, e: &[u8]) -> [u8; 32] {
     h.finalize().into()
 }
 
+/// Domain separator of [`chain_code`].
+const CHAIN_CODE_DOMAIN: &[u8] = b"tecdsa-1ole/hd-chain-code/v1";
+
+/// Public BIP32 chain code of a key: `SHA-256(domain ‖ X ‖ E)`. Both sides derive the same
+/// value from the shared keygen output, so no extra round is needed. It is public, as in
+/// BIP32, and does not depend on any secret.
+fn chain_code(x_pub: &ProjectivePoint, e: &[u8]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(CHAIN_CODE_DOMAIN);
+    h.update(encode_point(x_pub));
+    h.update(e);
+    h.finalize().into()
+}
+
 const SHARE_VERSION: u8 = 0x01;
 
 macro_rules! key_share {
@@ -139,6 +153,10 @@ macro_rules! key_share {
             /// The Paillier ciphertext `E` (fixed-width bytes).
             pub fn e_bytes(&self) -> &[u8] {
                 &self.e
+            }
+            /// Public chain code for HD derivation, identical on both sides.
+            pub fn chain_code(&self) -> [u8; 32] {
+                chain_code(&self.x_pub, &self.e)
             }
             /// `SHA-256(X ‖ E)`, the `key_id` of sign sessions.
             pub fn key_id(&self) -> [u8; 32] {
@@ -207,6 +225,15 @@ mod tests {
         let (server_share, m3) = s1.on_msg2(&mut rng, &m2).unwrap();
         let client_share = c1.on_msg3(&clock, &m3).unwrap();
         (client_share, server_share)
+    }
+
+    #[test]
+    fn chain_code_is_shared_and_key_bound() {
+        let (c, s) = run(5);
+        assert_eq!(c.chain_code(), s.chain_code());
+        let (c2, _) = run(6);
+        assert_ne!(c.chain_code(), c2.chain_code());
+        assert_ne!(c.chain_code(), c.key_id());
     }
 
     #[test]

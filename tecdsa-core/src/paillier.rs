@@ -141,6 +141,11 @@ impl PaillierSk {
         })
     }
 
+    /// The prime factors, for the explicit secret export only.
+    pub(crate) fn factors(&self) -> (&BoxedUint, &BoxedUint) {
+        (&self.p, &self.q)
+    }
+
     /// Decrypts `c ∈ Z*_{N²}` into `[0, N)` by CRT over `p²` and `q²`.
     pub fn dec(&self, c: &Residue) -> Result<BoxedUint> {
         let cb = c.retrieve();

@@ -230,6 +230,17 @@ pub fn client_public_key(
     Ok(tecdsa_core::curve::encode_point(share.public_key()).to_vec())
 }
 
+/// Public chain code (32 bytes) of a stored wallet for HD derivation.
+#[uniffi::export]
+pub fn client_chain_code(
+    store: Arc<dyn SecretStore>,
+    wallet_id: String,
+    profile: Profile,
+) -> Result<Vec<u8>, TecdsaError> {
+    let share = load_share(store, &wallet_id, profile)?;
+    Ok(share.chain_code().to_vec())
+}
+
 /// BIP32 derivation request: chain code (32 bytes) and non-hardened child indices.
 #[derive(uniffi::Record)]
 pub struct HdPathArg {

@@ -5,11 +5,11 @@
 //! application pins (FR-S8).
 use alloc::vec::Vec;
 use core::cmp::Ordering;
-use crypto_bigint::{BoxedUint, Gcd, Integer, NonZero, RandomMod};
+use crypto_bigint::{BoxedUint, ConcatenatingMul, Gcd, Integer, NonZero, RandomMod};
 use k256::ProjectivePoint;
 use rand_core::CryptoRng;
 use sha2::{Digest, Sha256};
-use zeroize::ZeroizeOnDrop;
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::{
     arith::{
@@ -74,9 +74,43 @@ impl core::fmt::Debug for ServerSetupSecret {
     }
 }
 
+/// Version byte of the exported server setup secret.
+const SECRET_VERSION: u8 = 0x01;
+
 impl ServerSetupSecret {
     pub fn paillier_sk(&self) -> &PaillierSk {
         &self.sk
+    }
+
+    /// Explicit export for a `SecretStore`: `version ‖ p ‖ q`, each `n_rsa/16` bytes.
+    pub fn export_secret(&self, params: &Params) -> Result<Zeroizing<Vec<u8>>> {
+        let len = nb(params) / 2;
+        let (p, q) = self.sk.factors();
+        let mut out = Zeroizing::new(Vec::with_capacity(1 + 2 * len));
+        out.push(SECRET_VERSION);
+        out.extend_from_slice(&Zeroizing::new(uint_to_be(p, len)?));
+        out.extend_from_slice(&Zeroizing::new(uint_to_be(q, len)?));
+        Ok(out)
+    }
+
+    /// Restores the secret exported by [`Self::export_secret`]; rejects it unless `p·q` is the
+    /// Paillier modulus `N` of `data`, so a secret cannot be paired with a foreign setup.
+    pub fn import_secret(bytes: &[u8], data: &SetupData) -> Result<Self> {
+        let len = nb(&data.params) / 2;
+        if bytes.len() != 1 + 2 * len || bytes[0] != SECRET_VERSION {
+            return Err(Error::InvalidEncoding);
+        }
+        let bits = len as u32 * 8;
+        let p = uint_from_be(&bytes[1..1 + len], bits)?;
+        let q = uint_from_be(&bytes[1 + len..], bits)?;
+        let sk = PaillierSk::new(p, q)?;
+        let (p, q) = sk.factors();
+        let n = p.concatenating_mul(q);
+        let bits = n.bits_precision().max(data.n.bits_precision());
+        if resized(&n, bits).cmp_vartime(resized(&data.n, bits)) != Ordering::Equal {
+            return Err(Error::InvalidEncoding);
+        }
+        Ok(Self { sk })
     }
 }
 
@@ -542,6 +576,28 @@ mod tests {
 
     fn ok(d: &SetupData) -> bool {
         d.verify_with(&small_params(), &fx().fac).is_ok()
+    }
+
+    #[test]
+    fn server_secret_export_roundtrip_and_binding() {
+        let f = fx();
+        let p = small_params();
+        let bytes = f.sk.export_secret(&p).unwrap();
+        let back = ServerSetupSecret::import_secret(&bytes, &f.data).unwrap();
+        let pk = f.data.paillier_pk().unwrap();
+        let c = pk.g_pow(&SBig::from_i64(777));
+        let m = back.paillier_sk().dec(&c).unwrap();
+        assert_eq!(resized(&m, 64), BoxedUint::from(777u64));
+        // a secret does not fit another setup
+        assert!(ServerSetupSecret::import_secret(&bytes, &f.other).is_err());
+        // malformed encodings
+        assert!(ServerSetupSecret::import_secret(&bytes[1..], &f.data).is_err());
+        let mut bad = bytes.to_vec();
+        bad[0] ^= 1;
+        assert!(ServerSetupSecret::import_secret(&bad, &f.data).is_err());
+        let mut bad = bytes.to_vec();
+        *bad.last_mut().unwrap() ^= 2;
+        assert!(ServerSetupSecret::import_secret(&bad, &f.data).is_err());
     }
 
     #[test]
