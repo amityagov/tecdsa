@@ -17,17 +17,30 @@
 
 ## Этап 1. Арифметика и примитивы
 
-- [ ] `arith/sbig.rs`: знаковое число, constant-time сложение/умножение/сравнение, `SRange::pm_pow2(n)` (|z| ≤ 2^{n−1}).
-- [ ] `arith/monty.rs`: `pow_ct` / `pow_vartime`, отрицательные показатели через инверсию, символ Якоби.
-- [ ] `arith/multiexp.rs` (Straus/Shamir на 2–4 базы), `arith/fixed_base.rs` (comb-таблицы).
-- [ ] `rsa/tough.rs`: `SampleRSA` / `SampleDF` (Algorithm 3), tough-простые, p₁ ≡ 3 и p₂ ≡ 7 (mod 8), gcd(p₁−1, p₂−1) = 2.
-- [ ] `paillier.rs`: `enc` с малым рандомизатором, `(1+N)^m = 1+mN`, CRT-дешифрование.
-- [ ] `df.rs`: коммиты Damgård–Fujisaki.
-- [ ] `curve.rs`: 𝒳(R), hash-to-curve для h и f, кодирование точек.
-- [ ] Property-тесты `proptest` против `dashu-int` как оракула (≥ 10⁵ случаев на операцию).
-- [ ] Бенчмарки `criterion`: enc, dec, `pow` на 3072 и 6144 бит; генерация tough-модуля на 3072 и 2048 бит.
+- [x] `arith/sbig.rs`: знаковое число, constant-time сложение/умножение/сравнение, `SRange::pm_pow2(n)` (|z| ≤ 2^{n−1}).
+- [x] `arith/monty.rs`: `pow_ct` / `pow_vartime`, отрицательные показатели через инверсию, символ Якоби.
+- [x] `arith/multiexp.rs` (Straus/Shamir на 2–4 базы), `arith/fixed_base.rs` (comb-таблицы).
+- [x] `rsa/tough.rs`: `SampleRSA` / `SampleDF` (Algorithm 3), tough-простые, p₁ ≡ 3 и p₂ ≡ 7 (mod 8), gcd(p₁−1, p₂−1) = 2.
+- [x] `paillier.rs`: `enc` с малым рандомизатором, `(1+N)^m = 1+mN`, CRT-дешифрование.
+- [x] `df.rs`: коммиты Damgård–Fujisaki.
+- [x] `curve.rs`: 𝒳(R), hash-to-curve для h и f, кодирование точек.
+- [x] Property-тесты `proptest` против `dashu-int` как оракула (≥ 10⁵ случаев на операцию).
+- [x] Бенчмарки `criterion`: enc, dec, `pow` на 3072 и 6144 бит; генерация tough-модуля на 3072 и 2048 бит.
 
-**Гейт:** замеры показывают, хватает ли `crypto-bigint` под бюджет §8.1. Если нет, включаем vartime-бэкенд на сервере. Пересматриваем бюджеты по реальным числам.
+**Результаты замеров** (Apple M-серия, release, один поток; `cargo bench -p tecdsa-core --bench arith`):
+
+| Операция | Время |
+| --- | --- |
+| Paillier enc, λ 1024 бит, mod N² (6144) | 12,7 мс |
+| Paillier dec (CRT) | 9,1 мс |
+| `pow_ct` mod N², показатель 448 бит (E^v) | 6,3 мс |
+| fixed-base `ρ^λ`, w=4, `pow_ct` / `pow_vartime` | 4,2 / 3,8 мс (таблица 3 МиБ на основание) |
+| SampleRSA 3072 бит (tough) | ~0,22 с (медиана), макс 0,37 с |
+| SampleDF клиента 2048 бит | ~0,14 с (медиана) |
+
+Вывод: `crypto-bigint` хватает, vartime-бэкенд `dashu-int` на сервере пока не нужен (остаётся оракулом в тестах). Открытый вопрос: бюджет таблиц ≤ 8 МБ тесен, 3 МиБ уходит на одно основание ρ; для t, s₁, s₂ нужно подобрать окно и `max_bits`.
+
+**Гейт (пройден):** замеры показывают, хватает ли `crypto-bigint` под бюджет §8.1. Если нет, включаем vartime-бэкенд на сервере. Пересматриваем бюджеты по реальным числам.
 
 ## Этап 2. Транскрипт и простые доказательства
 

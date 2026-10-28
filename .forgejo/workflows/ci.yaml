@@ -75,8 +75,8 @@ jobs:
           done
       - name: Duplicate RustCrypto versions
         run: |
-          # proc-macro helpers such as syn may legitimately appear twice.
-          dups="$(cargo tree -d --workspace --depth 0 | grep -E "^($UNIFIED_CRATES) " || true)"
+          # Shipped graph only (dev-deps like proptest pull their own rand); proc-macro helpers such as syn may appear twice.
+          dups="$(cargo tree -d --workspace -e normal,build --depth 0 | grep -E "^($UNIFIED_CRATES) " || true)"
           if [ -n "$dups" ]; then
             echo "$dups"
             echo "Duplicate versions in the RustCrypto graph"

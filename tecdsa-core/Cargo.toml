@@ -30,4 +30,12 @@ getrandom = { workspace = true, optional = true }
 dashu-int = { version = "0.4", optional = true }
 
 [dev-dependencies]
+dashu-int = "0.4"
+dashu-base = "0.4"
+proptest = "1"
+criterion = { version = "0.5", default-features = false }
 rand_chacha.workspace = true
+
+[[bench]]
+name = "arith"
+harness = false

@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-k256 = { version = "0.14", default-features = false, features = ["arithmetic", "ecdsa", "hash2curve", "serde"] }
+k256 = { version = "0.14", default-features = false, features = ["arithmetic", "ecdsa", "group-digest", "serde"] }
 crypto-bigint = { version = "0.7", default-features = false, features = ["alloc", "rand_core", "zeroize"] }
 crypto-primes = { version = "0.7", default-features = false }
 sha2 = { version = "0.11", default-features = false }
