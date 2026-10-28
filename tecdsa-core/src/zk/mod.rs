@@ -5,3 +5,4 @@ pub mod dlenc;
 pub mod dlog;
 pub mod fac;
 pub mod modulus;
+pub mod sig;

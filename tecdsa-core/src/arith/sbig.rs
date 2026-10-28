@@ -1,7 +1,7 @@
 //! Signed big integers over `BoxedUint` (sign + magnitude), constant-time where it matters.
 use alloc::vec::Vec;
 use crypto_bigint::{
-    BoxedUint, Choice, ConcatenatingMul, NonZero, RandomBits, Resize,
+    BoxedUint, Choice, ConcatenatingMul, NonZero, RandomBits, RandomMod, Resize,
     ctutils::{CtEq, CtSelect},
     rand_core::Rng,
 };
@@ -176,6 +176,19 @@ impl SBig {
         let d_neg = shift.wrapping_sub(&up);
         let mag = d.ct_select(&d_neg, under);
         Self::from_parts(under, mag)
+    }
+
+    /// Uniform sample from an interval of `size` consecutive integers `{−size/2+1, …, size/2}`
+    /// (`size` even, at least 2), i.e. the paper's `±size`.
+    pub fn random_in_size<R: Rng + ?Sized>(rng: &mut R, size: &BoxedUint) -> Result<Self> {
+        let prec = size.bits_precision() + 64;
+        let size_w = resized(size, prec);
+        let nz = Option::<NonZero<BoxedUint>>::from(size_w.to_nz()).ok_or(Error::OutOfRange)?;
+        let u = BoxedUint::random_mod_vartime(rng, &nz);
+        let half = size_w.shr_vartime(1).ok_or(Error::OutOfRange)?;
+        Ok(Self::from_uint(u)
+            .add(&Self::from_i64(1))
+            .sub(&Self::from_uint(half)))
     }
 
     /// Encodes as sign byte `0x00/0x01` followed by `⌈(n−1)/8⌉` big-endian magnitude bytes (spec §10.2).

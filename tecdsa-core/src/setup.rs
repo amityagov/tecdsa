@@ -385,6 +385,28 @@ impl SetupData {
     }
 }
 
+impl SetupData {
+    /// For the server's *own* data: builds the verified view without re-checking the proofs.
+    /// Never use this on data received from another party.
+    pub fn assume_verified(&self, params: &Params) -> Result<VerifiedSetup> {
+        if self.params != *params {
+            return Err(Error::VerificationFailed);
+        }
+        self.check_basic()?;
+        let st = DfStatement::from_uints(&self.n_hat, &self.t, &self.s1, &self.s2)?;
+        Ok(VerifiedSetup {
+            pk: self.paillier_pk()?,
+            df: DfParams::new(st.n_hat, st.t, st.s1, st.s2),
+            h: self.h,
+            f: self.f,
+            hash: self.hash()?,
+            server_id: self.server_id.clone(),
+            params: *params,
+            rho_table: None,
+        })
+    }
+}
+
 /// Setup that passed FR-S7.
 pub struct VerifiedSetup {
     pk: PaillierPk,
@@ -440,11 +462,22 @@ impl VerifiedSetup {
         self
     }
 
-    /// Default tables: window 4 for `ρ` (3 MiB at full size) and window 3 for `t, s₁, s₂`
-    /// with `n_tρ`-bit exponents (about 1.4 MiB each) — together ≈ 7.3 MiB < 8 MiB.
-    pub fn with_tables(self) -> Self {
-        let bits = self.params.n_t_rho;
-        self.with_tables_custom(RHO_TABLE_WINDOW, bits, DF_TABLE_WINDOW)
+    /// Default tables sized for the exponents of Π_sig and signing (mask widths include ε):
+    /// `ρ`: `n_λ0 + ε` bits (window 4), `t`: `n_tρ + ε`, `s₁`: `n_a + ε`, `s₂`: `n_b + ε` (window 3).
+    pub fn with_tables(mut self) -> Self {
+        let p = self.params;
+        let eps = p.eps();
+        self.rho_table = Some(FixedBase::new(
+            self.pk.mod_n2(),
+            self.pk.rho(),
+            p.n_lambda0() + eps,
+            RHO_TABLE_WINDOW,
+        ));
+        self.df = self.df.with_tables_sized(
+            [p.n_t_rho + eps, p.n_a() + eps, p.n_b() + eps],
+            DF_TABLE_WINDOW,
+        );
+        self
     }
 
     /// Total memory of the tables in bytes.

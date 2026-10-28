@@ -122,6 +122,30 @@ pub struct KgMsg3 {
     pub psi_dlenc: Vec<u8>,
 }
 
+/// S → C: `R₂` and `Y = X₁^{k₂}`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SignMsg1 {
+    pub r2: Vec<u8>,
+    pub y: Vec<u8>,
+}
+
+/// C → S: `R₁`, `R`, the ciphertext `S` and `ψ_sig`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SignMsg2 {
+    pub r1: Vec<u8>,
+    pub r: Vec<u8>,
+    pub s_ct: Vec<u8>,
+    pub psi_sig: Vec<u8>,
+}
+
+/// S → C (optional): the final signature `(r, s, recid)`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SignMsg3 {
+    pub r: Vec<u8>,
+    pub s: Vec<u8>,
+    pub recid: u8,
+}
+
 macro_rules! codec {
     ($t:ty, $ty:expr) => {
         impl $t {
@@ -137,3 +161,6 @@ macro_rules! codec {
 codec!(KgMsg1, MsgType::KgMsg1);
 codec!(KgMsg2, MsgType::KgMsg2);
 codec!(KgMsg3, MsgType::KgMsg3);
+codec!(SignMsg1, MsgType::SignMsg1);
+codec!(SignMsg2, MsgType::SignMsg2);
+codec!(SignMsg3, MsgType::SignMsg3);

@@ -53,6 +53,17 @@ impl DfParams {
         self
     }
 
+    /// Like [`Self::with_tables`] with a separate exponent width per base: `[t, s₁, s₂]`.
+    pub fn with_tables_sized(mut self, max_bits: [u32; 3], window: u32) -> Self {
+        let m = &self.modulus;
+        self.tables = Some([
+            FixedBase::new(m, &self.t, max_bits[0], window),
+            FixedBase::new(m, &self.s1, max_bits[1], window),
+            FixedBase::new(m, &self.s2, max_bits[2], window),
+        ]);
+        self
+    }
+
     /// Memory held by precomputed tables, in bytes.
     pub fn tables_size_bytes(&self) -> usize {
         self.tables

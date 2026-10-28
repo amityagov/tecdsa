@@ -18,9 +18,13 @@ pub mod paillier;
 pub mod params;
 pub mod rsa;
 pub mod setup;
+pub mod sign;
 pub mod ssid;
 pub mod transcript;
 pub mod zk;
 
 /// Wire protocol version, written into every message envelope.
 pub const PROTOCOL_VERSION: u16 = 1;
+
+#[cfg(test)]
+pub(crate) mod testutil;

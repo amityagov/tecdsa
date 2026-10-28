@@ -189,63 +189,13 @@ mod tests {
     use super::*;
     use crate::{
         arith::sbig::SBig,
-        params::{PARAMS_128, ParamsId},
-        rsa::tough::{ToughSpec, sample_tough_prime},
-        setup::{ServerSetupSecret, SetupData, VerifiedSetup, server_setup_with},
-        zk::fac::FacParams,
+        params::PARAMS_128,
+        testutil::{TestClock, fx, params},
     };
     use core::cell::Cell;
     use k256::ProjectivePoint;
     use rand_chacha::ChaCha8Rng;
     use rand_core::SeedableRng;
-    use std::sync::OnceLock;
-
-    struct TestClock(Cell<u64>);
-    impl Clock for TestClock {
-        fn now_ms(&self) -> u64 {
-            self.0.get()
-        }
-    }
-
-    fn params() -> Params {
-        Params {
-            id: ParamsId::P128,
-            ell: 16,
-            nu: 16,
-            n_rsa: 512,
-            n_client: 512,
-            r_mod: 8,
-            r_df: 16,
-            r_df_star: 4,
-            tough_count: 4,
-            tough_bits: 64,
-            ..PARAMS_128
-        }
-    }
-
-    struct Fx {
-        fac: FacParams,
-        data: SetupData,
-        sk: ServerSetupSecret,
-    }
-
-    fn fx() -> &'static Fx {
-        static F: OnceLock<Fx> = OnceLock::new();
-        F.get_or_init(|| {
-            let p = params();
-            let mut rng = ChaCha8Rng::seed_from_u64(1);
-            let d_bits = p.n_rsa + 2 * p.ell + 2 * p.nu + 4;
-            let d = sample_tough_prime(&mut rng, d_bits, 7, ToughSpec::SAFE).unwrap();
-            let fac = FacParams::new(d.p().clone()).unwrap();
-            let (data, sk) = server_setup_with(&mut rng, &p, &fac, [7u8; 32], b"server-A").unwrap();
-            Fx { fac, data, sk }
-        })
-    }
-
-    fn verified() -> VerifiedSetup {
-        let f = fx();
-        f.data.verify_with(&params(), &f.fac).unwrap()
-    }
 
     fn run(seed: u64) -> (ClientKeyShare, ServerKeyShare) {
         let p = params();
@@ -253,7 +203,7 @@ mod tests {
         let clock = TestClock(Cell::new(1_000));
         let (s1, m1) = ServerKeygen0::start(&mut rng, &p, &fx().data, b"client-1").unwrap();
         let (c1, m2) =
-            ClientKeygen0::on_msg1(&mut rng, &clock, &verified(), b"client-1", &m1).unwrap();
+            ClientKeygen0::on_msg1(&mut rng, &clock, &fx().setup, b"client-1", &m1).unwrap();
         let (server_share, m3) = s1.on_msg2(&mut rng, &m2).unwrap();
         let client_share = c1.on_msg3(&clock, &m3).unwrap();
         (client_share, server_share)
@@ -305,7 +255,7 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(9);
         let (s1, m1) = ServerKeygen0::start(&mut rng, &p, &fx().data, b"client-1").unwrap();
         let (c1, m2) =
-            ClientKeygen0::on_msg1(&mut rng, &clock, &verified(), b"client-1", &m1).unwrap();
+            ClientKeygen0::on_msg1(&mut rng, &clock, &fx().setup, b"client-1", &m1).unwrap();
 
         // KgMsg2 corruption: server must reject (decode or verification).
         let positions = [
@@ -373,7 +323,7 @@ mod tests {
         let clock = TestClock(Cell::new(0));
         let (s1, m1) = ServerKeygen0::start(&mut rng, &p, &fx().data, b"client-1").unwrap();
         let (c1, m2) =
-            ClientKeygen0::on_msg1(&mut rng, &clock, &verified(), b"client-1", &m1).unwrap();
+            ClientKeygen0::on_msg1(&mut rng, &clock, &fx().setup, b"client-1", &m1).unwrap();
         let (_, m3) = s1.on_msg2(&mut rng, &m2).unwrap();
 
         // exactly at the limit passes, one millisecond later fails
@@ -389,14 +339,14 @@ mod tests {
         clock.0.set(0);
         let (s2, m1b) = ServerKeygen0::start(&mut rng, &p, &fx().data, b"client-1").unwrap();
         let (c2, m2b) =
-            ClientKeygen0::on_msg1(&mut rng, &clock, &verified(), b"client-OTHER", &m1b).unwrap();
+            ClientKeygen0::on_msg1(&mut rng, &clock, &fx().setup, b"client-OTHER", &m1b).unwrap();
         assert!(s2.on_msg2(&mut rng, &m2b).is_err());
         drop(c2);
 
         // KgMsg3 of another session is rejected by the client
         let (s3, m1c) = ServerKeygen0::start(&mut rng, &p, &fx().data, b"client-1").unwrap();
         let (c3, m2c) =
-            ClientKeygen0::on_msg1(&mut rng, &clock, &verified(), b"client-1", &m1c).unwrap();
+            ClientKeygen0::on_msg1(&mut rng, &clock, &fx().setup, b"client-1", &m1c).unwrap();
         let (_, m3c) = s3.on_msg2(&mut rng, &m2c).unwrap();
         assert!(c3.on_msg3(&clock, &m3).is_err());
         let _ = m3c;
