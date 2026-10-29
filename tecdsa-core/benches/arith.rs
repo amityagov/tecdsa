@@ -1,4 +1,4 @@
-//! Stage-1 gate: enc/dec and `pow` at 3072/6144 bits (spec §9.2).
+//! enc/dec and `pow` at 3072/6144 bits; results are in docs/BENCHMARKS.md.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use crypto_bigint::{BoxedUint, ConcatenatingMul};
