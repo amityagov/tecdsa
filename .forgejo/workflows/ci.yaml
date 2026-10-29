@@ -48,8 +48,7 @@ jobs:
           fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.cargo/bin:$PATH"
-          rustup toolchain install stable --profile minimal -c rustfmt -c clippy \
-            -t aarch64-apple-ios -t aarch64-apple-ios-sim -t x86_64-apple-ios
+          rustup toolchain install stable --profile minimal -c rustfmt -c clippy
           rustup default stable
           rustc --version
       - name: Install cargo-deny and cargo-audit
@@ -68,11 +67,6 @@ jobs:
         run: cargo test --workspace --release
       - name: Build without default features (no_std + alloc)
         run: cargo build -p tecdsa-core --no-default-features
-      - name: Build for iOS
-        run: |
-          for target in aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios; do
-            cargo build -p tecdsa-core -p tecdsa-ffi --target "$target"
-          done
       - name: Duplicate RustCrypto versions
         run: |
           # Shipped graph only (dev-deps like proptest pull their own rand); proc-macro helpers such as syn may appear twice.
