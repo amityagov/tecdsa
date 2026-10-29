@@ -1,5 +1,10 @@
 # tecdsa-1ole
 
+[![crates.io](https://img.shields.io/crates/v/tecdsa-core.svg)](https://crates.io/crates/tecdsa-core)
+[![docs.rs](https://img.shields.io/docsrs/tecdsa-core)](https://docs.rs/tecdsa-core)
+[![CI](https://github.com/amityagov/tecdsa/actions/workflows/ci.yml/badge.svg)](https://github.com/amityagov/tecdsa/actions/workflows/ci.yml)
+[![License](https://img.shields.io/crates/l/tecdsa-core.svg)](#license)
+
 **Two-party ECDSA on secp256k1 in pure Rust.** A mobile client and a server hold one key in two shares
 and sign together, in **two rounds** and about **2 KB** of traffic. The private key never exists in one
 place. The signature is an ordinary ECDSA signature that any Bitcoin or Ethereum verifier accepts.
