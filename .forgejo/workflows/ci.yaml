@@ -77,10 +77,10 @@ jobs:
             exit 1
           fi
       - name: Licenses, bans and sources
-        run: cargo deny check licenses bans sources
+        run: cargo deny --all-features check licenses bans sources
       - name: Advisories
         run: |
-          cargo deny check advisories
+          cargo deny --all-features check advisories
           cargo audit
 
       - name: Save build cache after failures

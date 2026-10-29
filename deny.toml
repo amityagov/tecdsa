@@ -3,6 +3,11 @@
 
 [advisories]
 version = 2
+ignore = [
+    # basic-toml reaches us only through uniffi_bindgen -> askama, the Swift bindings generator that runs
+    # at build time. It is not in tecdsa-core and not in the shipped library. Drop this when uniffi moves on.
+    { id = "RUSTSEC-2026-0374", reason = "build-time bindings generator only (uniffi_bindgen -> askama)" },
+]
 
 [licenses]
 version = 2
@@ -26,6 +31,14 @@ allow = ["MPL-2.0"]
 
 [[licenses.exceptions]]
 crate = "uniffi_core"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "uniffi_bindgen"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "uniffi_udl"
 allow = ["MPL-2.0"]
 
 [[licenses.exceptions]]
