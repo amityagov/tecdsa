@@ -25,3 +25,30 @@ rustc-ice-*.txt
 fuzz/target
 fuzz/corpus
 fuzz/artifacts
+
+# Secrets and credentials: never commit these.
+# Environment files (a committed .env.example is fine).
+.env
+.env.*
+!.env.example
+# Private keys and certificates.
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+# Apple signing material and local Xcode settings.
+*.mobileprovision
+*.certSigningRequest
+*.cer
+*.xcconfig
+xcuserdata/
+# Exported key shares and server setup secrets (the output of `export_secret`), if dumped to disk.
+*.secret
+secrets/
+
+# Local tool state.
+.DS_Store
+.claude/settings.local.json
