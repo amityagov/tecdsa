@@ -58,6 +58,7 @@ The full design, parameters and wire format are in [`docs/SPEC.md`](docs/SPEC.md
 | `tecdsa-ffi/` | [UniFFI](https://mozilla.github.io/uniffi-rs/) bindings for the client side, for Swift. |
 | `fuzz/` | libFuzzer targets for the message and proof parsers. |
 | `vectors/` | Deterministic test vectors that pin the wire format. |
+| `examples/ios/` | Swift sources: a Keychain `SecretStore` and an on-device benchmark. |
 | `scripts/` | `build-xcframework.sh`: builds `TecdsaFFI.xcframework` for device and simulator. |
 | `docs/` | Specification, benchmarks, audit notes. |
 
@@ -110,10 +111,10 @@ rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 scripts/build-xcframework.sh     # target/xcframework/TecdsaFFI.xcframework + Swift bindings
 ```
 
-A SwiftUI benchmark app that runs the whole protocol on a device lives in a separate repository,
-`tecdsa-ios-example`, so this repository builds on Linux and carries no signing identifiers. The
-`bench-server` feature of `tecdsa-ffi` exists only for that app: it runs the server inside the process.
-**Never enable it in a product build.**
+[`examples/ios/`](examples/ios) holds Swift sources only (no Xcode project, so the repository builds on
+Linux and carries no signing identifiers): a Keychain-backed `SecretStore` and a SwiftUI benchmark that
+runs the whole protocol on a device. The benchmark needs the `bench-server` feature of `tecdsa-ffi`,
+which runs the server inside the process. **Never enable it in a product build.**
 
 ## Security
 

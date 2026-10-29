@@ -2,7 +2,7 @@
 
 Measured results for the 128-bit profile (`PARAMS_128`). Desktop numbers are from an Apple M-series
 laptop, release build, one thread. Phone numbers come from the example app in
-the separate `tecdsa-ios-example` repository, which runs the server inside
+[`examples/ios`](../examples/ios), which runs the server inside
 the app so no network is involved.
 
 The budgets they are compared with are in [`SPEC.md`](SPEC.md) §8.1.
