@@ -126,7 +126,7 @@ which runs the server inside the process. **Never enable it in a product build.*
   memory, so one signing session must stay on one process.
 - Fuzzing so far was short (40 s per target). A 24-hour run per target is still to do.
 
-To report a vulnerability, please do not open a public issue; contact the maintainers privately.
+To report a vulnerability, please do not open a public issue; follow [`SECURITY.md`](SECURITY.md).
 
 ## Documentation
 
@@ -135,6 +135,7 @@ To report a vulnerability, please do not open a public issue; contact the mainta
 | [`docs/SPEC.md`](docs/SPEC.md) | Design specification: parameters, protocols, proofs, encodings |
 | [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) | Measured performance on desktop and iPhone |
 | [`docs/AUDIT.md`](docs/AUDIT.md) | Map for reviewers, ZK checklist, deviations, fuzzing |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release notes |
 | [`docs/COMPARISON-mpc-lib.md`](docs/COMPARISON-mpc-lib.md) | Comparison with the `mpc-lib` implementation of the same protocol family |
 
 ## License
