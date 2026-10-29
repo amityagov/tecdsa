@@ -1,94 +1,99 @@
-# Материалы для внешнего аудита
+# Notes for an external audit
 
-Крейт `tecdsa-core` реализует Two-Round 2PC ECDSA at the Cost of 1 OLE (Adjedj et al., ePrint 1950)
-на secp256k1. Спецификация: «ТЗ 2PC ECDSA (1 OLE) на чистом Rust.md», статья: `1950.pdf`
-(текст и страницы: `docs/paper/`). Эта заметка — карта для аудитора, а не заключение о безопасности:
-**внешнего аудита ещё не было**.
+The `tecdsa-core` crate implements *Two-Round 2PC ECDSA at the Cost of 1 OLE* (Adjedj et al.,
+[ePrint 2025/1950](https://eprint.iacr.org/2025/1950)) on secp256k1. The design is in
+[`SPEC.md`](SPEC.md). This note is a map for a reviewer, not a statement about security: **the code has
+not been externally audited.**
 
-## Что где
+## Where things are
 
-| Область | Файлы |
+| Area | Files |
 | --- | --- |
-| Арифметика (знаковые целые, Монтгомери, multiexp, fixed-base) | `arith/` |
-| Paillier с `ρ^λ`, DF-параметры, тяжёлые простые | `paillier.rs`, `df.rs`, `rsa/tough.rs` |
-| Транскрипт Fiat–Shamir | `transcript.rs` |
-| Доказательства | `zk/{dlog,df,df_star,fac,modulus,dlenc,sig}.rs` |
-| Setup, keygen, подпись | `setup.rs`, `keygen/`, `sign/`, `ssid.rs`, `messages.rs` |
-| Хранение долей | `store.rs` |
+| Arithmetic (signed integers, Montgomery, multiexp, fixed-base) | `arith/` |
+| Paillier with `ρ^λ`, DF parameters, tough primes | `paillier.rs`, `df.rs`, `rsa/tough.rs` |
+| Fiat–Shamir transcript | `transcript.rs` |
+| Proofs | `zk/{dlog,df,df_star,fac,modulus,dlenc,sig}.rs` |
+| Setup, keygen, signing | `setup.rs`, `keygen/`, `sign/`, `ssid.rs`, `messages.rs` |
+| Child key derivation | `hd.rs` |
+| Share storage | `store.rs` |
 | FFI | `tecdsa-ffi/` |
 
-Инварианты кода: `forbid(unsafe_code)`; в ядре запрещены `unwrap/expect/panic` (clippy deny); секреты
-`ZeroizeOnDrop`/`Zeroizing`; никаких нативных зависимостей; лицензии контролирует `cargo deny`.
+Code invariants: `forbid(unsafe_code)`; `unwrap`/`expect`/`panic` are denied in the core (clippy); secrets
+are `ZeroizeOnDrop`/`Zeroizing`; no native dependencies; `cargo deny` controls licenses.
 
-## Чек-лист ZK (§7 ТЗ): что проверяется и чем покрыто
+## ZK checklist (spec §7): what is checked and what covers it
 
-Общее для всех доказательств: утверждение (statement) целиком попадает в транскрипт вместе с `ssid`
-и ролью; проверка границ ответов — до проверки уравнений; элементы групп/колец проверяются на
-принадлежность (`Z*_N`, `Z*_{N²}`, каноничная кодировка точки, скаляр < q); декодеры отвергают
-некоторые хвосты и неканоничные значения. Негативные тесты есть для каждого поля доказательства.
+Common to all proofs: the whole statement goes into the transcript together with the `ssid` and the
+role; the bounds on the responses are checked before the equations; group and ring elements are checked
+for membership (`Z*_N`, `Z*_{N²}`, canonical point encoding, scalar < q); decoders reject trailing bytes
+and non-canonical values. There are negative tests for every proof field.
 
-| Доказательство | Что доказывает | Что проверяет верификатор | Тесты |
+| Proof | What it proves | What the verifier checks | Tests |
 | --- | --- | --- | --- |
-| `dlog` | знание `x`, `X = g^x` | каноничность, уравнение | honest, many_seeds, tampering, wrong_witness, decode |
-| `df` | параметры DF корректны (знание `λ`) | границы, уравнения всех повторов | honest, tampering, wrong_witness, decode |
-| `df_star` | DF клиента, две проверки (e1,e2) на повтор | то же | honest, tampering, wrong_witness, decode |
-| `fac` | `N` без малых множителей | границы `z`, группа `d` | boundaries, unbalanced, modified_fields |
-| `modulus` | `N` — свободный от квадратов, ровно два простых | Якоби/корни, min_bits | bad_moduli, three_factor, modified_fields |
-| `dlenc` | `E = enc(x2'; ·)` и `X2` согласованы | диапазон, ρ и шифртекст в `Z*` | bad_ciphertext_and_rho, tampering |
-| `sig` | `S = enc(a; ρ^λ0)·E^b` с `a,b,λ0` в диапазонах | границы `z1,z2` (+ защитные `w1,w2`), 3 уравнения | tampering, wrong_witness_and_ranges, tables_give_same_result |
+| `dlog` | knowledge of `x`, `X = g^x` | canonical encoding, the equation | honest, many_seeds, tampering, wrong_witness, decode |
+| `df` | the DF parameters are well formed (knowledge of `λ`) | bounds, the equations of all repetitions | honest, tampering, wrong_witness, decode |
+| `df_star` | the client's DF parameters, two checks (e1, e2) per repetition | same | honest, tampering, wrong_witness, decode |
+| `fac` | `N` has no small factors | bounds on `z`, the group of `d` | boundaries, unbalanced, modified_fields |
+| `modulus` | `N` is square-free with exactly two primes | Jacobi/roots, min_bits | bad_moduli, three_factor, modified_fields |
+| `dlenc` | `E = enc(x2'; ·)` and `X2` agree | range, ρ and the ciphertext in `Z*` | bad_ciphertext_and_rho, tampering |
+| `sig` | `S = enc(a; ρ^λ0)·E^b` with `a,b,λ0` in range | bounds on `z1,z2` (plus guard bounds `w1,w2`), 3 equations | tampering, wrong_witness_and_ranges, tables_give_same_result |
 
-Дополнительно: тесты сессионной привязки (чужой дайджест, `client_id`, сообщение другой сессии),
-порча каждого сообщения протоколов, `robustness.rs` (мутации входов всех разборщиков и входов
-протокола), `vectors/reduced.json` (детерминированный регресс).
+Also covered: session-binding tests (a foreign digest, `client_id`, a message of another session),
+corruption of every protocol message, `robustness.rs` (mutations of the inputs of every parser and of
+the protocol inputs), and `vectors/reduced.json` (a deterministic regression).
 
-## Отклонения от статьи и открытые вопросы
+## Deviations from the paper and open questions
 
-1. **ℓ0 = 8** выбран нами; в статье параметр не определён однозначно (вопрос авторам открыт).
-2. **Π_df\*:** два вызова (e1, e2) на повторение, как в статье; в таблице ТЗ для KgMsg2 указан один байт `e`.
-3. **h, f** выводятся из случайных `setup_id ‖ len ‖ server_id` (разрыв круговой зависимости из ТЗ);
-   `sid` = SHA-256 канонических байт `SetupData`.
-4. **Π_sig:** добавлены защитные границы `w1`, `w2` (в статье проверяются только `z1`, `z2`);
-   честный доказывающий перезапускается с вероятностью порядка 2^-ν.
-5. **Π_fac в `verify()`** использует стандартную группу `d = 2^3459 + 1169115`; `verify_with` — для тестов.
-6. Клиентская DF-факторизация удаляется сразу после доказательств; тяжёлые простые клиента — по Alg. 3 статьи.
-7. Таймер сессии keygen 60 с задаётся через трейт `Clock`; ядро `no_std` и не читает время само.
-8. Для 112-битного профиля параметр T из статьи не подтверждён.
+1. **ℓ0 = 8** is our choice; the paper does not define the parameter unambiguously (the question to the
+   authors is open).
+2. **Π_df\*:** two calls (e1, e2) per repetition, as in the paper; the spec table for KgMsg2 lists a single
+   byte `e`.
+3. **h, f** are derived from the random `setup_id ‖ len ‖ server_id` (this breaks the circular dependency in
+   the spec); `sid` is the SHA-256 of the canonical bytes of `SetupData`.
+4. **Π_sig:** guard bounds `w1`, `w2` are added (the paper checks only `z1`, `z2`); an honest prover restarts
+   with probability on the order of 2^-ν.
+5. **Π_fac in `verify()`** uses the standard group `d = 2^3459 + 1169115`; `verify_with` is for tests.
+6. The client's DF factorization is deleted right after proving; the client's tough primes follow Alg. 3
+   of the paper.
+7. The 60 s keygen session timer is supplied through the `Clock` trait; the core is `no_std` and never reads
+   the time itself.
+8. For the 112-bit profile the parameter T of the paper is not confirmed.
 
-## Постоянное время
+## Constant time
 
-`tests/ct.rs` (ignored, запускать на тихой машине) — dudect-подобный t-тест времени `Modulus::pow_ct`
-и `FixedBase::pow_ct` между двумя классами экспонент (малое значение и полная ширина со случайным знаком):
-`|t| ≈ 1` на Apple M. Оговорки: ширина (число лимбов) экспоненты считается публичной — тест первым
-запуском выявил, что при разной ширине время отличается; все протокольные экспоненты приходят
-фиксированной ширины, но это стоит перепроверить аудитором. Не проверялись: `dec` (CRT), скалярное
-умножение (`k256`), `invert`, перебор в `Modulus::new`. Серверные операции с публичными данными
-(`pow_vartime`, multiexp) работают за переменное время намеренно.
+`tests/ct.rs` (ignored; run on a quiet machine) is a dudect-style t-test of the timing of
+`Modulus::pow_ct` and `FixedBase::pow_ct` between two classes of exponents (a small value and a full-width
+value with a random sign): `|t| ≈ 1` on Apple M. Caveats: the width (number of limbs) of the exponent is
+treated as public — the first run of the test showed that the time differs with different widths; every
+protocol exponent arrives at a fixed width, but a reviewer should double-check this. Not checked: `dec`
+(CRT), scalar multiplication (`k256`), `invert`, the search in `Modulus::new`. Server operations on public
+data (`pow_vartime`, multiexp) run in variable time on purpose.
 
 ## Fuzzing
 
-`fuzz/` — три цели libFuzzer, только разбор входов: `messages` (все сообщения, точки, скаляры),
-`setup_and_secrets` (`SetupData::from_bytes`, импорт долей), `zk_decoders` (`dlog`, `df_star`, `dlenc`, `sig`).
-Крейт `fuzz/` вне workspace и собирается на nightly.
+`fuzz/` has three libFuzzer targets, input parsing only: `messages` (all messages, points, scalars),
+`setup_and_secrets` (`SetupData::from_bytes`, share import), `zk_decoders` (`dlog`, `df_star`, `dlenc`,
+`sig`). The `fuzz/` crate is outside the workspace and builds on nightly.
 
-Установка и запуск (из корня репозитория):
+Install and run (from the repository root):
 
 ```sh
 cargo install cargo-fuzz
-rustup toolchain install nightly          # если ещё нет
+rustup toolchain install nightly          # if missing
 cd fuzz
 cargo +nightly fuzz list                  # messages, setup_and_secrets, zk_decoders
-cargo +nightly fuzz run messages          # до остановки Ctrl-C
-cargo +nightly fuzz run messages -- -max_total_time=86400    # 24 часа (требование ТЗ)
+cargo +nightly fuzz run messages          # until Ctrl-C
+cargo +nightly fuzz run messages -- -max_total_time=86400    # 24 hours
 cargo +nightly fuzz run setup_and_secrets -- -max_total_time=86400 -max_len=70000
 cargo +nightly fuzz run zk_decoders -- -max_total_time=86400 -max_len=70000
 ```
 
-Три цели удобно гонять параллельно (по одной на ядро; `-jobs=N -workers=N` — несколько процессов на цель).
-Корпус лежит в `fuzz/corpus/<цель>/` (в git не коммитится), падения — в `fuzz/artifacts/<цель>/`.
-Воспроизвести падение: `cargo +nightly fuzz run <цель> fuzz/artifacts/<цель>/<файл>`;
-минимизировать: `cargo +nightly fuzz tmin <цель> <файл>`; покрытие: `cargo +nightly fuzz coverage <цель>`.
-Хороший стартовый корпус — реальные сообщения протокола: их можно сохранить из тестов
-(`robustness.rs`) в `fuzz/corpus/messages/`. Критерий прохождения: 24 ч на каждую цель без падений и таймаутов.
+The three targets are convenient to run in parallel (one per core; `-jobs=N -workers=N` runs several
+processes per target). The corpus lives in `fuzz/corpus/<target>/` (not committed), crashes in
+`fuzz/artifacts/<target>/`. Reproduce a crash with `cargo +nightly fuzz run <target> fuzz/artifacts/<target>/<file>`,
+minimize with `cargo +nightly fuzz tmin <target> <file>`, coverage with `cargo +nightly fuzz coverage <target>`.
+A good starting corpus is real protocol messages: they can be saved from the tests (`robustness.rs`) into
+`fuzz/corpus/messages/`. The release criterion is 24 hours per target without crashes or timeouts.
 
-Статус: **24 часа с покрытием не прогонялись.** Ранее цели запускались по 40 с без инструментирования
-покрытия (это почти случайный ввод и слабая проверка); падений не было.
+Status: **24-hour runs with coverage have not been done.** The targets were run for 40 s each without
+coverage instrumentation (nearly random input and a weak check); there were no crashes.
