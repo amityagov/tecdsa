@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Crates whose versions must not be duplicated in the dependency graph.
+  UNIFIED_CRATES: k256|elliptic-curve|crypto-bigint|crypto-primes|rand_core|digest|sha2|zeroize|subtle
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --release
+      - name: Build without default features (no_std + alloc)
+        run: cargo build -p tecdsa-core --no-default-features
+      - name: Package the core crate
+        run: cargo package -p tecdsa-core
+      - name: Duplicate RustCrypto versions
+        run: |
+          dups="$(cargo tree -d --workspace -e normal,build --depth 0 | grep -E "^($UNIFIED_CRATES) " || true)"
+          if [ -n "$dups" ]; then
+            echo "$dups"
+            echo "Duplicate versions in the RustCrypto graph"
+            exit 1
+          fi
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses bans sources advisories
