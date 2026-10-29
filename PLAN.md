@@ -122,7 +122,7 @@
 - [x] `tecdsa-ffi` на `uniffi` 0.32 (MPL-2.0, исключения в `deny.toml` только для crate'ов `uniffi*`), трейт `SecretStore` (foreign), `scripts/build-xcframework.sh` (устройство + симулятор, Swift-биндинги).
 - [x] Release-профиль: LTO fat, `codegen-units = 1`, `panic = "abort"`, `strip`. Размер: cdylib 0,8 МиБ (в приложение линкуется только достижимый код; `.a` 24 МБ до линковки), цель ≤ 3 МБ выполнена.
 - [x] Тест `getrandom`: источник — `SysRng` (на iOS `getentropy`/`SecRandomCopyBytes` через getrandom 0.4), на хосте сквозной тест проходит; запуск именно на симуляторе не делался.
-- [x] Тестовое приложение `ios/TecdsaBench` (SwiftUI, xcodegen, Keychain-хранилище, сервер в процессе через feature `bench-server`): собирается и подписывается для устройства, на симуляторе отрабатывает целиком (проверен и `SysRng`, и Keychain).
+- [x] Тестовое приложение `TecdsaBench` (вынесено в отдельный репозиторий `tecdsa-ios-example`; SwiftUI, xcodegen, Keychain-хранилище, сервер в процессе через feature `bench-server`): собирается и подписывается для устройства, на симуляторе отрабатывает целиком (проверен и `SysRng`, и Keychain).
 - [x] Замеры на iPhone 16 Pro (iPhone17,1, iOS 27.0, Release, 1000 keygen и 1000 подписей подряд, термосостояние к концу `fair`):
 
 | Операция | Результат | Гейт |
