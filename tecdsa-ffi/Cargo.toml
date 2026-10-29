@@ -5,7 +5,12 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+# UniFFI bindings are built from source into the xcframework, not published.
+publish = false
 
 [lib]
 crate-type = ["staticlib", "cdylib", "lib"]
