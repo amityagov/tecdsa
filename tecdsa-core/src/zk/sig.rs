@@ -537,6 +537,27 @@ mod tests {
         pr.verify(&tx, &f.p, &f.st()).unwrap();
     }
 
+    /// `z1` shifted by `N·q` leaves the Paillier equation (binds `u` mod `N`) and the curve equation
+    /// (binds `u` mod `q`) unchanged. Only the integer bound, enforced through the DF commitment, rejects
+    /// it. If the DF part were dropped, a client could pick `u` near `N/2` and read one bit of the
+    /// server's share per signing attempt (see `docs/AUDIT.md`, "The DF part of Π_sig").
+    #[test]
+    fn z1_shifted_by_nq_is_rejected() {
+        let (f, mut rng) = fixture(4, small_params(), false);
+        let tx = Transcript::new("test");
+        let pr = SigProof::prove(&mut rng, &tx, &f.p, &f.st(), &f.w).unwrap();
+        assert!(pr.verify(&tx, &f.p, &f.st()).is_ok());
+        let nq = SBig::from_uint(crypto_bigint::ConcatenatingMul::concatenating_mul(
+            f.pk.n(),
+            &crate::curve::order(),
+        ));
+        for shift in [nq.clone(), nq.negate()] {
+            let mut b = pr.clone();
+            b.z1 = b.z1.add(&shift);
+            assert!(b.verify(&tx, &f.p, &f.st()).is_err());
+        }
+    }
+
     #[test]
     fn tampering_fails() {
         let (f, mut rng) = fixture(4, small_params(), false);

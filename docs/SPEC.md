@@ -329,7 +329,8 @@ budgets below leave headroom. Measured results are in [`BENCHMARKS.md`](BENCHMAR
 
 - **Constant time:** every operation on x₁, x₂, k₁, k₂, β, λ₀, μ, μ′, the ZK masks and φ(N). Checked with a
   dudect-style tool on the critical functions.
-- **Secrets:** every secret type is `ZeroizeOnDrop`, without `Clone`; `Debug` prints `***`. Secrets are
+- **Secrets:** every secret type is `ZeroizeOnDrop`, without `Clone`; `Debug` prints `***` (the Montgomery
+  parameters of the secret moduli and some temporaries cannot be wiped, see `AUDIT.md`, "Known limitations"). Secrets are
   serialized only through an explicit `export_secret()` for `SecretStore`.
 - **No panics** in `tecdsa-core`: `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
   Every error is returned through `Result`.

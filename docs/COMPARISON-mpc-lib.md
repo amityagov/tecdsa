@@ -26,8 +26,10 @@ paper from 2025-06-01, this code cites the version of 6 March 2026.
    `zero_digest_is_rejected_by_both_sides`.
 2. **Π_sig without the DF part in the reference.** The reference proof contains only `D, U, V, z₁, z₂, w₀, w₂`;
    there is no `P̃, B̃, w₁`. This version (following the 2026 paper) adds the DF commitment
-   `P̃ = s₁^a s₂^b t^µ` and the related equation. It is not established whether that part is needed for
-   soundness or only tightens the proof relative to the 2025 version; this is a **question for the authors**.
+   `P̃ = s₁^a s₂^b t^µ` and the related equation. **The part is needed for soundness:** without it `u` is
+   bound only modulo `N` and `q`, and the server's recentering around `N/2` becomes a one-bit oracle on
+   `x₂′` (see `AUDIT.md`, "The DF part of Π_sig"). The reference may compensate elsewhere in code that was
+   not read; worth asking its maintainers.
 3. **Range of λ₀.** Reference: `n_λ0 = max(n_a + 2ℓ + ν, n_b + n_λ + ε) + ν` = 1408 bits (176 B), response
    `w₂` 200 B. Here: `n_λ + ε + n_b + ν` = 1024 bits, `w₂` 153 B. These come from different versions of the
    paper; to be checked against the paper and with the authors.

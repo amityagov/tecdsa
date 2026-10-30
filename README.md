@@ -25,7 +25,7 @@ It implements [*Two-Round 2PC ECDSA at the Cost of 1 OLE*](https://eprint.iacr.o
 - **Small messages.** A signature is `SignMsg1` (70 B), `SignMsg2` (about 1.9 KB), and an optional
   `SignMsg3` (70 B).
 - **Built for hostile input.** `#![forbid(unsafe_code)]`; no `unwrap`, `expect` or `panic` in the core;
-  secrets are `ZeroizeOnDrop`; every proof has negative tests for each field; parsers are fuzzed.
+  secrets are `ZeroizeOnDrop` (with the limits in `docs/AUDIT.md`); every proof has negative tests for each field; parsers are fuzzed.
 - **Transport and storage are yours.** The crate takes and returns bytes, and stores shares through a
   `SecretStore` trait that you implement (Keychain on iOS, for example).
 - **HD wallets.** BIP32 non-hardened derivation is supported: sign under `X + δ·G` for any path.
