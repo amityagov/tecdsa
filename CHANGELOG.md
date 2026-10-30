@@ -4,6 +4,20 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 and versions follow [Semantic Versioning](https://semver.org/); while the version is `0.x`, minor releases may
 break the API and the wire format.
 
+## [0.2.0]
+
+**Wire format of key generation changes** (`KgMsg2`); signing and stored data are unchanged.
+
+- `ℓ0` of Π_df* is 32, the value the paper's parameter table assumes (it was 8). A cheating client could
+  pass a small-subgroup check with probability up to `2^-112` before; now `2^-128`. The proof mask is
+  `±2^{2ℓ+2ℓ0+ν}` (the paper's `ν_df* = ℓ0 + 64`), which also gives the full 64 bits of hiding.
+  Π_df* grows from 720 to 928 B and `KgMsg2` from 1842 to 2050 B; prove and verify stay in the same few
+  milliseconds.
+- Existing setups and shares keep working: `ℓ0` only shapes the key-generation proof, and the setup
+  encoding, the setup hash, the shares and signing do not depend on it (test
+  `setup_and_shares_do_not_depend_on_l0`). A new key generation needs the client and the server on 0.2.0.
+- `vectors/reduced.json` regenerated.
+
 ## [0.1.3]
 
 Hardening after an independent review. No change to the wire format or the parameters.
