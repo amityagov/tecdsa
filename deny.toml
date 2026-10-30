@@ -65,6 +65,11 @@ deny = [
     { crate = "malachite" },
     { crate = "native-tls" },
 ]
+# `syn` is a compile-time helper of proc-macros (uniffi, zerocopy-derive, ...); two majors are in the
+# build graph and neither is linked into the shipped code. The RustCrypto crates are checked separately in CI.
+skip = [
+    { crate = "syn@2", reason = "proc-macro helper, build time only" },
+]
 
 [sources]
 unknown-registry = "deny"
