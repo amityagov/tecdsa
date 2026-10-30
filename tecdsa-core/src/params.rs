@@ -97,7 +97,8 @@ pub const PARAMS_128: Params = Params {
 };
 
 /// Benchmark-only profile: 112-bit security.
-// TODO(spec §5): tough_count × tough_bits = 5 × 224 = 1120 > 1024; to be clarified.
+// Tough primes are 1024 bits here (n_rsa / 2), so the factors of (p−1)/2 are sized to fit:
+// 5 factors of about 205 bits (the 128-bit profile uses 6 × 256 = 1536).
 pub const PARAMS_112: Params = Params {
     id: ParamsId::P112,
     kappa: 256,
@@ -112,7 +113,7 @@ pub const PARAMS_112: Params = Params {
     ell0: 8,
     n_t_rho: 1344,
     tough_count: 5,
-    tough_bits: 224,
+    tough_bits: 205,
 };
 
 const _: () = assert!(PARAMS_128.is_consistent());

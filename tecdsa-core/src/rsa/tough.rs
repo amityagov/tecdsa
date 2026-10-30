@@ -630,9 +630,11 @@ pub fn sample_df_client<R: CryptoRng + ?Sized>(
     params: &Params,
 ) -> Result<DfTuple, ToughError> {
     // Paper (Algorithm 3): T = ⌈n/4ℓ⌉ primes of 2ℓ bits, same as the server.
+    // When 4ℓ does not divide n (ℓ = 112), the factors are sized to fill the half-length prime.
+    let count = params.n_client.div_ceil(4 * params.ell);
     let spec = ToughSpec {
-        count: params.n_client.div_ceil(4 * params.ell),
-        bits: 2 * params.ell,
+        count,
+        bits: (params.n_client / 2).div_ceil(count),
     };
     sample_df_with(rng, params.n_client, spec, params.ell)
 }
