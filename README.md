@@ -119,14 +119,16 @@ scripts/build-xcframework.sh     # target/xcframework/TecdsaFFI.xcframework + Sw
 [`examples/ios/`](examples/ios) holds Swift sources only (no Xcode project, so the repository builds on
 Linux and carries no signing identifiers): a Keychain-backed `SecretStore` and a SwiftUI benchmark that
 runs the whole protocol on a device. The benchmark needs the `bench-server` feature of `tecdsa-ffi`,
-which runs the server inside the process. **Never enable it in a product build.**
+which runs the server inside the process. **Never enable it in a product build**; a product should also
+assert `benchServerEnabled() == false` at start-up.
 
 ## Security
 
 - The code has not been audited. Read [`docs/AUDIT.md`](docs/AUDIT.md) for the review map, the list of
   deviations from the paper and the open questions.
 - Authenticating the server setup is the application's job. The crate returns a hash of `SetupData`;
-  pin it in your app or have it signed by a long-term server key.
+  pin it in your app or have it signed by a long-term server key. In the Swift API use
+  `ClientSetup.verifyPinned`, which checks that hash first; plain `verify` accepts any well-formed setup.
 - Keeping the server's state between the two signing rounds is not implemented yet: `ServerSign1` lives in
   memory, so one signing session must stay on one process.
 - Fuzzing so far was short (40 s per target). A 24-hour run per target is still to do.

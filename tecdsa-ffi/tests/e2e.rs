@@ -37,6 +37,13 @@ fn keygen_and_sign_through_ffi() {
     let (data, sk) = server_setup(&mut rng, &p, [3u8; 32], b"server").unwrap();
     let setup = ClientSetup::verify(data.to_bytes().unwrap(), Profile::P128).unwrap();
     assert_eq!(setup.hash(), data.hash().unwrap().to_vec());
+    let pinned = data.hash().unwrap().to_vec();
+    assert!(ClientSetup::verify_pinned(data.to_bytes().unwrap(), pinned, Profile::P128).is_ok());
+    assert!(matches!(
+        ClientSetup::verify_pinned(data.to_bytes().unwrap(), vec![0u8; 32], Profile::P128),
+        Err(TecdsaError::Verification)
+    ));
+    assert!(!bench_server_enabled());
 
     let store: Arc<dyn SecretStore> = Arc::new(Mem::default());
     let (s1, m1) = ServerKeygen0::start(&mut rng, &p, &data, b"client").unwrap();

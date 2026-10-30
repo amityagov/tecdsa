@@ -23,6 +23,13 @@ use zeroize::Zeroizing;
 
 uniffi::setup_scaffolding!();
 
+/// `true` when this library was built with the in-process benchmark server. A product build must
+/// assert that it is `false` at start-up.
+#[uniffi::export]
+pub fn bench_server_enabled() -> bool {
+    cfg!(feature = "bench-server")
+}
+
 #[cfg(feature = "bench-server")]
 mod bench_server;
 #[cfg(feature = "bench-server")]
@@ -137,6 +144,24 @@ impl ClientSetup {
     pub fn verify(setup_bytes: Vec<u8>, profile: Profile) -> Result<Arc<Self>, TecdsaError> {
         let p = params(profile);
         let data = SetupData::from_bytes(&setup_bytes, &p)?;
+        let inner = data.verify(&p)?.with_tables();
+        Ok(Arc::new(Self { inner, profile }))
+    }
+
+    /// Like `verify`, but first checks that the setup is the one the application pinned
+    /// (`expected_hash`, from `hash()` of a setup it trusts). This is the call to use in a product:
+    /// `verify` alone accepts the setup of any server, as long as it is well formed.
+    #[uniffi::constructor]
+    pub fn verify_pinned(
+        setup_bytes: Vec<u8>,
+        expected_hash: Vec<u8>,
+        profile: Profile,
+    ) -> Result<Arc<Self>, TecdsaError> {
+        let p = params(profile);
+        let data = SetupData::from_bytes(&setup_bytes, &p)?;
+        if data.hash()?.as_slice() != expected_hash.as_slice() {
+            return Err(TecdsaError::Verification);
+        }
         let inner = data.verify(&p)?.with_tables();
         Ok(Arc::new(Self { inner, profile }))
     }
