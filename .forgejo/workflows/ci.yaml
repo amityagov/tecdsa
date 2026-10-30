@@ -11,6 +11,13 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Pinned: a new stable release must not change the lints under a merged change. Bump on purpose.
+  RUST_TOOLCHAIN: 1.99.1
+  RUSTUP_VERSION: 1.29.2
+  # SHA-256 of rustup-init for x86_64-unknown-linux-gnu at RUSTUP_VERSION.
+  RUSTUP_INIT_SHA256: 5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4
+  CARGO_DENY_VERSION: 0.20.2
+  CARGO_AUDIT_VERSION: 0.22.2
   # Crates whose versions must not be duplicated in the dependency graph.
   UNIFIED_CRATES: k256|elliptic-curve|crypto-bigint|crypto-primes|rand_core|digest|sha2|zeroize|subtle
 
@@ -19,11 +26,12 @@ jobs:
     runs-on: runner
 
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to commits; the comment is the tag the commit belongs to.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - name: Restore build cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
         id: cache-build
         with:
           path: target/
@@ -31,12 +39,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-x86_64-tecdsa-
       - name: Cache rust and cargo tools
-        uses: actions/cache@v3
+        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
         with:
           path: |
             ~/.rustup
             ~/.cargo
-          key: rust-${{ runner.os }}-x86_64-tecdsa-v1
+          key: rust-${{ runner.os }}-x86_64-tecdsa-v2
       - name: Install system deps
         run: |
           apt-get update
@@ -44,29 +52,34 @@ jobs:
       - name: Install Rust
         run: |
           if ! command -v rustup >/dev/null 2>&1 && [ ! -x "$HOME/.cargo/bin/rustup" ]; then
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+            # A pinned rustup-init, checked against its hash, instead of piping a script into a shell.
+            curl -sSfo /tmp/rustup-init \
+              "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init"
+            echo "${RUSTUP_INIT_SHA256}  /tmp/rustup-init" | sha256sum -c -
+            chmod +x /tmp/rustup-init
+            /tmp/rustup-init -y --profile minimal --default-toolchain none
           fi
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.cargo/bin:$PATH"
-          rustup toolchain install stable --profile minimal -c rustfmt -c clippy
-          rustup default stable
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal -c rustfmt -c clippy
+          rustup default "$RUST_TOOLCHAIN"
           rustc --version
       - name: Install cargo-deny and cargo-audit
         run: |
-          for tool in cargo-deny cargo-audit; do
-            if ! command -v "$tool" >/dev/null 2>&1; then
-              cargo install --locked "$tool"
-            fi
-          done
+          # The tools are rebuilt when the cached binary is not the pinned version.
+          cargo deny --version 2>/dev/null | grep -qF "$CARGO_DENY_VERSION" \
+            || cargo install --locked --force "cargo-deny@${CARGO_DENY_VERSION}"
+          cargo audit --version 2>/dev/null | grep -qF "$CARGO_AUDIT_VERSION" \
+            || cargo install --locked --force "cargo-audit@${CARGO_AUDIT_VERSION}"
 
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Tests
-        run: cargo test --workspace --release
+        run: cargo test --locked --workspace --release
       - name: Build without default features (no_std + alloc)
-        run: cargo build -p tecdsa-core --no-default-features
+        run: cargo build --locked -p tecdsa-core --no-default-features
       - name: Duplicate RustCrypto versions
         run: |
           # Shipped graph only (dev-deps like proptest pull their own rand); proc-macro helpers such as syn may appear twice.
@@ -85,7 +98,7 @@ jobs:
 
       - name: Save build cache after failures
         if: always() && steps.cache-build.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
         with:
           path: target/
           key: ${{ steps.cache-build.outputs.cache-primary-key }}

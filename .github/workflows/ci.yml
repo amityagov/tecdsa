@@ -9,6 +9,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Pinned: a new stable release must not change the lints under a merged change. Bump on purpose.
+  RUST_TOOLCHAIN: 1.99.1
   # Crates whose versions must not be duplicated in the dependency graph.
   UNIFIED_CRATES: k256|elliptic-curve|crypto-bigint|crypto-primes|rand_core|digest|sha2|zeroize|subtle
 
@@ -19,23 +21,25 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      # Actions are pinned to commits; the comment is the tag the commit belongs to.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, toolchain pinned below
         with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Tests
-        run: cargo test --workspace --release
+        run: cargo test --locked --workspace --release
       - name: Build without default features (no_std + alloc)
-        run: cargo build -p tecdsa-core --no-default-features
+        run: cargo build --locked -p tecdsa-core --no-default-features
       - name: Package the core crate
-        run: cargo package -p tecdsa-core
+        run: cargo package --locked -p tecdsa-core
       - name: Duplicate RustCrypto versions
         run: |
           dups="$(cargo tree -d --workspace -e normal,build --depth 0 | grep -E "^($UNIFIED_CRATES) " || true)"
@@ -48,9 +52,10 @@ jobs:
   supply-chain:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      # This release runs cargo-deny 0.20.2 from its own pinned image.
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check licenses bans sources advisories
