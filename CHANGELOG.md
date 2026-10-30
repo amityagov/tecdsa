@@ -4,7 +4,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 and versions follow [Semantic Versioning](https://semver.org/); while the version is `0.x`, minor releases may
 break the API and the wire format.
 
-## [Unreleased]
+## [0.1.3]
 
 Hardening after an independent review. No change to the wire format or the parameters.
 
