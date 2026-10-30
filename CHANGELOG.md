@@ -4,6 +4,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 and versions follow [Semantic Versioning](https://semver.org/); while the version is `0.x`, minor releases may
 break the API and the wire format.
 
+## [0.1.2]
+
+- Fixed the 112-bit profile (`PARAMS_112`, benchmark only): its tough-prime shape did not fit into the
+  1024-bit primes, so setup and client key generation failed (`InvalidInput` through the FFI). The
+  factors of `(p-1)/2` are now 5 × 205 bits for the server and are sized to fill the prime for the client.
+  The 128-bit profile and the wire format are unchanged. Added `tecdsa-ffi/tests/e2e_112.rs`.
+
 ## [0.1.1]
 
 No change to the protocols or the wire format.
