@@ -123,6 +123,14 @@ fn lt(a: &BoxedUint, b: &BoxedUint) -> bool {
     resized(a, bits).cmp_vartime(resized(b, bits)) == Ordering::Less
 }
 
+/// `a` is `1` or `n − 1`.
+fn is_trivial(a: &BoxedUint, n: &BoxedUint) -> bool {
+    let bits = a.bits_precision().max(n.bits_precision());
+    let (a, n) = (resized(a, bits), resized(n, bits));
+    let one = BoxedUint::one_with_precision(bits);
+    a == one || a.wrapping_add(&one) == n
+}
+
 fn is_unit(a: &BoxedUint, n: &BoxedUint) -> bool {
     let bits = a.bits_precision().max(n.bits_precision());
     bool::from(resized(a, bits).gcd_vartime(&resized(n, bits)).is_one())
@@ -374,6 +382,21 @@ impl SetupData {
             if !lt(v, &self.n_hat) || !is_unit(v, &self.n_hat) {
                 return Err(fail);
             }
+        }
+        // The paper's checks accept 1 (and −1), which would drop the Paillier randomizer
+        // (ρ = 1 gives E = (1+N)^x, readable by anyone) or the DF binding. A server that picks
+        // them only hurts itself, but the client can refuse to talk to it.
+        if is_trivial(&self.rho0, &self.n)
+            || bool::from(self.rho.is_one())
+            || [&self.t, &self.s1, &self.s2]
+                .into_iter()
+                .any(|v| is_trivial(v, &self.n_hat))
+            || self.t == self.s1
+            || self.t == self.s2
+            || self.s1 == self.s2
+            || self.n == self.n_hat
+        {
+            return Err(fail);
         }
         Ok(())
     }
@@ -759,6 +782,47 @@ mod tests {
             }
         }
         assert!(ok(&f.data));
+    }
+
+    #[test]
+    fn degenerate_values_rejected() {
+        let f = fx();
+        let one = |b: &BoxedUint| BoxedUint::one_with_precision(b.bits_precision());
+        let minus_one = |b: &BoxedUint, n: &BoxedUint| {
+            let bits = b.bits_precision().max(n.bits_precision());
+            resized(n, bits).wrapping_sub(BoxedUint::one_with_precision(bits))
+        };
+        let mut cases: Vec<SetupData> = Vec::new();
+        let mut d = f.data.clone();
+        d.rho0 = one(&d.rho0);
+        d.rho = one(&d.rho);
+        cases.push(d);
+        let mut d = f.data.clone();
+        d.rho0 = minus_one(&d.rho0, &d.n);
+        cases.push(d);
+        let mut d = f.data.clone();
+        d.rho = one(&d.rho);
+        cases.push(d);
+        for field in 0..3 {
+            let mut d = f.data.clone();
+            let v = one(&d.t);
+            match field {
+                0 => d.t = v,
+                1 => d.s1 = v,
+                _ => d.s2 = v,
+            }
+            cases.push(d);
+        }
+        let mut d = f.data.clone();
+        d.t = minus_one(&d.t, &d.n_hat);
+        cases.push(d);
+        let mut d = f.data.clone();
+        d.s2 = d.s1.clone();
+        cases.push(d);
+        for (i, d) in cases.iter().enumerate() {
+            assert!(d.check_basic().is_err(), "case {i} accepted");
+        }
+        assert!(f.data.check_basic().is_ok());
     }
 
     #[test]
