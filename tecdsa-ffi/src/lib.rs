@@ -40,6 +40,8 @@ pub enum TecdsaError {
     NotFound,
     #[error("secret store failure")]
     Storage,
+    #[error("a wallet with this id already exists")]
+    AlreadyExists,
     #[error("session already used")]
     SessionConsumed,
     #[error("internal error")]
@@ -53,6 +55,7 @@ impl From<CoreError> for TecdsaError {
             CoreError::Timeout => Self::Timeout,
             CoreError::NotFound => Self::NotFound,
             CoreError::Storage => Self::Storage,
+            CoreError::AlreadyExists => Self::AlreadyExists,
             CoreError::InvalidEncoding | CoreError::OutOfRange | CoreError::InvalidModulus => {
                 Self::InvalidInput
             }
@@ -185,6 +188,7 @@ impl ClientKeygen {
     }
 
     /// Processes `KgMsg3`, stores the share under `wallet_id` and returns the public data.
+    /// Fails with `AlreadyExists` and keeps the old share if the wallet already has one.
     /// The session can be finished only once.
     pub fn finish(
         &self,

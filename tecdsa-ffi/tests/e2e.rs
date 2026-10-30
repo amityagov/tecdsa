@@ -55,6 +55,18 @@ fn keygen_and_sign_through_ffi() {
         client_public_key(store.clone(), "nope".into(), Profile::P128),
         Err(TecdsaError::NotFound)
     ));
+    // A second key generation under the same wallet id must not replace the stored share.
+    let (s1b, m1b) = ServerKeygen0::start(&mut rng, &p, &data, b"client").unwrap();
+    let kgb = ClientKeygen::start(setup.clone(), b"client".to_vec(), m1b).unwrap();
+    let (_, m3b) = s1b.on_msg2(&mut rng, &kgb.msg2()).unwrap();
+    assert!(matches!(
+        kgb.finish(m3b, "w1".into(), store.clone()),
+        Err(TecdsaError::AlreadyExists)
+    ));
+    assert_eq!(
+        res.public_key,
+        client_public_key(store.clone(), "w1".into(), Profile::P128).unwrap()
+    );
 
     let server_view = data.assume_verified(&p).unwrap().with_tables();
     let vk = VerifyingKey::from_sec1_bytes(&res.public_key).unwrap();

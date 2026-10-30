@@ -25,9 +25,24 @@ fn server_key(wallet_id: &str) -> String {
     format!("tecdsa/server-share/{wallet_id}")
 }
 
+/// Writes a new secret; an existing one is never replaced (a malicious peer could otherwise
+/// destroy a share by restarting key generation under a known wallet id).
+fn put_new(store: &dyn SecretStore, key: &str, value: &[u8]) -> Result<()> {
+    if store.get(key)?.is_some() {
+        return Err(Error::AlreadyExists);
+    }
+    store.put(key, value)
+}
+
 impl ClientKeyShare {
     /// Writes the share through `store` (explicit `export_secret`, spec §8.2).
+    /// Fails with `AlreadyExists` if the wallet already has a client share.
     pub fn save(&self, store: &dyn SecretStore, wallet_id: &str) -> Result<()> {
+        put_new(store, &client_key(wallet_id), &self.export_secret())
+    }
+
+    /// Like `save`, but replaces an existing share. Only for a deliberate restore.
+    pub fn replace(&self, store: &dyn SecretStore, wallet_id: &str) -> Result<()> {
         store.put(&client_key(wallet_id), &self.export_secret())
     }
 
@@ -38,7 +53,13 @@ impl ClientKeyShare {
 }
 
 impl ServerKeyShare {
+    /// Fails with `AlreadyExists` if the wallet already has a server share.
     pub fn save(&self, store: &dyn SecretStore, wallet_id: &str) -> Result<()> {
+        put_new(store, &server_key(wallet_id), &self.export_secret())
+    }
+
+    /// Like `save`, but replaces an existing share. Only for a deliberate restore.
+    pub fn replace(&self, store: &dyn SecretStore, wallet_id: &str) -> Result<()> {
         store.put(&server_key(wallet_id), &self.export_secret())
     }
 
@@ -89,5 +110,28 @@ mod tests {
         );
         store.delete(&client_key("w1")).unwrap();
         assert!(ClientKeyShare::load(&store, "w1", &params()).is_err());
+    }
+
+    #[test]
+    fn save_never_overwrites() {
+        let (c, s) = keygen(41);
+        let (c_other, s_other) = keygen(42);
+        let store = MemStore::default();
+        c.save(&store, "w1").unwrap();
+        s.save(&store, "w1").unwrap();
+        assert_eq!(
+            c_other.save(&store, "w1").unwrap_err(),
+            Error::AlreadyExists
+        );
+        assert_eq!(
+            s_other.save(&store, "w1").unwrap_err(),
+            Error::AlreadyExists
+        );
+        let kept = ClientKeyShare::load(&store, "w1", &params()).unwrap();
+        assert_eq!(kept.key_id(), c.key_id());
+        c_other.replace(&store, "w1").unwrap();
+        s_other.replace(&store, "w1").unwrap();
+        let now = ClientKeyShare::load(&store, "w1", &params()).unwrap();
+        assert_eq!(now.key_id(), c_other.key_id());
     }
 }

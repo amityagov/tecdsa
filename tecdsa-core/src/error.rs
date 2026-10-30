@@ -21,6 +21,8 @@ pub enum Error {
     NotFound,
     #[error("secret store failure")]
     Storage,
+    #[error("a secret already exists under this name")]
+    AlreadyExists,
 }
 
 impl From<crate::rsa::tough::ToughError> for Error {
