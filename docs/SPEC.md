@@ -456,7 +456,7 @@ Sizes for the 128-bit profile (N 3072, N² 6144, N̂ 3072, M̂ 2048 bits):
 | Message | Direction | Fields | Size, bytes |
 | --- | --- | --- | --- |
 | KgMsg1 | S → C | kg\_nonce 32, B 32 | ≈ 68 |
-| KgMsg2 | C → S | X₁ 33; M̂, v, u₁, u₂ 256 each; ψ\_df\*: 16 × (e 1 + z ≈ 42); ψ\_dlog: e 17 + z 32 | ≈ 1 800 |
+| KgMsg2 | C → S | X₁ 33; M̂, v, u₁, u₂ 256 each; ψ\_df\*: 16 × (e₁, e₂ 4 + 4, z 50); ψ\_dlog: e 17 + z 32 | ≈ 2 050 |
 | KgMsg3 | S → C | X₂ 33; E 768; ψ\_dlenc: P̃ 256, e 17, z₁ 65, z₂ 65, z₃ 289 | ≈ 1 500 |
 | SignMsg1 | S → C | R₂ 33, Y 33 | ≈ 70 |
 | SignMsg2 | C → S | R₁ 33, R 33, S 768; ψ\_sig: P̃ 384, Ũ 33, e 17, z₁ 153, z₂ 81, w₀ 32, w₁ 201, w₂ 153 | ≈ 1 890 |

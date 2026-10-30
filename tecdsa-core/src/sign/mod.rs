@@ -237,6 +237,31 @@ mod tests {
         assert_eq!(parities.len(), 2, "both y parities must occur");
     }
 
+    /// `ℓ0` only shapes the Π_df* proof of a key generation. A setup and the shares made under another
+    /// `ℓ0` (before 0.2.0 it was 8) are read and used unchanged: same setup hash, same signatures.
+    #[test]
+    fn setup_and_shares_do_not_depend_on_l0() {
+        use crate::{params::Params, setup::SetupData};
+        let (c, s) = keygen(24);
+        let old = Params {
+            ell0: 8,
+            ..params()
+        };
+        let bytes = fx().data.to_bytes().unwrap();
+        let data = SetupData::from_bytes_with(&bytes, &old, &fx().fac).unwrap();
+        assert_eq!(data.hash().unwrap(), fx().data.hash().unwrap());
+        let setup = data.verify_with(&old, &fx().fac).unwrap().with_tables();
+        let server_view = data.assume_verified(&old).unwrap().with_tables();
+        let mut rng = ChaCha8Rng::seed_from_u64(24);
+        let d = digest(&mut rng);
+        let vk = VerifyingKey::from_affine(c.public_key().to_affine()).unwrap();
+        let (s1, m1) =
+            ServerSign0::start(&mut rng, &server_view, &s, b"client-1", &d, None).unwrap();
+        let m2 = ClientSign::respond(&mut rng, &setup, &c, b"client-1", &d, &m1, None).unwrap();
+        let (sig, _) = s1.finish(&server_view, fx().sk.paillier_sk(), &m2).unwrap();
+        vk.verify_prehash(&d, &sig.to_ecdsa().unwrap()).unwrap();
+    }
+
     #[test]
     fn same_digest_gives_fresh_nonces() {
         let (c, s) = keygen(22);

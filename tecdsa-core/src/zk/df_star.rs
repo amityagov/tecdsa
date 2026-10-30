@@ -2,8 +2,8 @@
 //! `(M̂, v, u1, u2)` (roles `N̂→M̂`, `t→v`, `s1→u1`, `s2→u2`). `r_df_star` repetitions, one
 //! Fiat–Shamir challenge, two `ℓ0`-bit challenges `(e1, e2)` per repetition.
 //!
-//! Mask `α ∈ ±2^{2ℓ+ℓ0+ν}` (paper: `±2^{ℓ0+ν}·max_i 2^{⌈log λ_i⌉}` with `λ_i < 2^{2ℓ}`).
-//! The verifier additionally enforces the defensive bound `|z| ≤ 2^{2ℓ+ℓ0+ν+1}`.
+//! Mask `α ∈ ±2^{2ℓ+2ℓ0+ν}` (paper: `±2^{ℓ0+ν_df*}·max_i 2^{⌈log λ_i⌉}` with `λ_i < 2^{2ℓ}` and
+//! `ν_df* = ℓ0 + 64`). The verifier additionally enforces the defensive bound `|z| ≤ 2^{mask+1}`.
 use alloc::vec::Vec;
 use crypto_bigint::BoxedUint;
 use rand_core::CryptoRng;
@@ -21,15 +21,17 @@ use crate::{
     transcript::Transcript,
 };
 
+/// `α ← ±2^{2ℓ+2ℓ0+ν}`: the paper's implementation note uses `ν_df* = ℓ0 + 64` for this proof, so
+/// the mask hides `e₁λ₁ + e₂λ₂` (up to `2ℓ+ℓ0+1` bits) with `ℓ0 + ν − 1` bits to spare.
 fn mask_bits(params: &Params) -> u32 {
-    2 * params.ell + params.ell0 + params.nu
+    2 * params.ell + 2 * params.ell0 + params.nu
 }
 
 fn mask_range(params: &Params) -> SRange {
     SRange::pm_pow2(mask_bits(params))
 }
 
-/// Response range `±2^{2ℓ+ℓ0+ν+2}` i.e. `|z| ≤ 2^{2ℓ+ℓ0+ν+1}`.
+/// Response range `±2^{mask+2}`, i.e. `|z| ≤ 2^{mask+1}`.
 fn z_range(params: &Params) -> SRange {
     SRange::pm_pow2(mask_bits(params) + 2)
 }

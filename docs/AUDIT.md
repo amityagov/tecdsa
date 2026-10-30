@@ -45,12 +45,15 @@ the protocol inputs), and `vectors/reduced.json` (a deterministic regression).
 
 ## Deviations from the paper and open questions
 
-1. **ℓ0 = 8** is our choice; the paper does not define the parameter unambiguously (the question to the
-   authors is open). Section 8.1 of the paper assumes `(r_df*, ℓ0) ≥ (16, 32)`. With `ℓ0 = 8` the per-round
-   soundness is `1/ω + 2^-8` (Proposition 5.20), so a cheating subgroup of order `2^8`, `2^10`, `2^12` is
-   accepted with probability about `2^-112`, `2^-123`, `2^-127`; the floor `2^-128` holds for large `ω`. The
-   leak is at most `log₂ ω` bits of `x₂′` and `β`, which `ν_leak = 64` absorbs. The Π_df* mask `α` has 62 bits
-   of statistical hiding (`2ℓ + ℓ0 + ν`), not 64. Moving to `ℓ0 = 32` changes the wire format of `KgMsg2`.
+1. **ℓ0 = 32** (0.2.0 and later), the value section 8.1 of the paper assumes (`(r_df*, ℓ0) ≥ (16, 32)`).
+   Versions up to 0.1.3 used `ℓ0 = 8`, which our reading of sections 6.2–6.3 gave
+   (`ℓ0 = ⌈ℓ/r_df*⌉`); with it the per-round soundness is `1/ω + 2^-8` (Proposition 5.20), so a cheating
+   subgroup of order `2^8`, `2^10`, `2^12` passed with probability about `2^-112`, `2^-123`, `2^-127`. The
+   leak was at most `log₂ ω` bits of `x₂′` and `β`, which `ν_leak = 64` absorbs. The mask is now
+   `α ∈ ±2^{2ℓ+2ℓ0+ν}` (the paper's `ν_df* = ℓ0 + 64`). The question to the authors about what they mean by
+   `ℓ0` is still open. `ℓ0` shapes only the Π_df* proof of a key generation: setups and shares made
+   before 0.2.0 are read and used unchanged (test `setup_and_shares_do_not_depend_on_l0`); only a key
+   generation needs both parties on 0.2.0 or later.
 2. **Π_df\*:** two calls (e1, e2) per repetition, as in the paper; the spec table for KgMsg2 lists a single
    byte `e`.
 3. **h, f** are derived from the random `setup_id ‖ len ‖ server_id` (this breaks the circular dependency in

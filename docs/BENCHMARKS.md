@@ -32,13 +32,13 @@ oracle in tests. The fixed-base tables for all four bases take 7.1 MiB, inside t
 | Π_mod | N 3072 bit, 64 repetitions | 0.49 s | 0.56 s | 49,216 B |
 | Π_fac | N 3072 bit, d = 2^3459+1169115 | 94 ms | 56 ms | 2,616 B |
 | Π_df | N̂ 3072 bit, 128 repetitions | 89 ms | 25 ms | 5,280 B |
-| Π_df* | M̂ 2048 bit, 16 repetitions, ℓ0 = 8 | 6.7 ms | 3.7 ms | 720 B |
+| Π_df* | M̂ 2048 bit, 16 repetitions, ℓ0 = 32 | ≈ 7–13 ms | ≈ 4–5 ms | 928 B |
 | Π_dlog | ℓ = 128 | — | — | 49 B |
 | Π_dlenc | | 16 ms | 12 ms | 692 B |
 | Π_sig | | 23 ms | 28 ms | 1,054 B |
 
-Π_df* sends two challenges (e₁, e₂) per repetition, as the paper does, which is why it is 720 B rather
-than about 690 B.
+Π_df* sends two challenges (e₁, e₂) per repetition, as the paper does, which is why it is 928 B rather
+than about 860 B.
 
 ## Setup and key generation (desktop)
 
@@ -47,7 +47,7 @@ than about 690 B.
 | Server setup (Algorithm 4) | 1.14 s | `SetupData` 60 KB |
 | Client verifies setup | 0.68 s (Π_mod 0.57 s) | — |
 | Keygen S, step 1 | 0.2 ms | KgMsg1 70 B |
-| Keygen C, step 2 (including M̂ generation) | 119 ms | KgMsg2 1,842 B |
+| Keygen C, step 2 (including M̂ generation) | 119–129 ms | KgMsg2 2,050 B |
 | Keygen S, step 3 | 25 ms | KgMsg3 1,502 B |
 | Keygen C, step 4 | 12 ms | — |
 
@@ -73,7 +73,7 @@ iPhone17,1, iOS 27.0, Release build, 1000 key generations and 1000 signatures in
 | Setup verification + tables | 705 ms | ≤ 4 s |
 | Client keygen (steps 2 + 4) | median 124 ms, p99 202 ms, max 292 ms | p99 ≤ 3 s |
 | Signing, client step | median 35.6 ms, p99 37.1 ms, max 37.8 ms | ≤ 150 ms |
-| Messages | KgMsg2 1842 B, KgMsg3 1502 B, SignMsg1 72 B, SignMsg2 1898 B | — |
+| Messages (measured at 0.1.3 with ℓ0 = 8; KgMsg2 is 2050 B since 0.2.0) | KgMsg2 1842 B, KgMsg3 1502 B, SignMsg1 72 B, SignMsg2 1898 B | — |
 
 With BIP32 derivation (100 signatures on paths m/44/0/0/0/i, each verified under `X + δ·G` and rejected
 under the master key): client step median 32.1 ms, p99 35.2 ms; server step S3 38.3 ms. Derivation adds no
