@@ -4,6 +4,30 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 and versions follow [Semantic Versioning](https://semver.org/); while the version is `0.x`, minor releases may
 break the API and the wire format.
 
+## [0.3.0]
+
+**The stored share format changes.** The wire format, the setup encoding and its hash, keys and addresses
+are unchanged, so 0.3.0 and 0.2.x parties still run key generation and signing with each other.
+
+- A key share is bound to the setup it was generated under. The share stores the setup hash (share format
+  2: `0x02 ‖ share ‖ X ‖ setup hash ‖ E`), and `ClientSign::respond` and `ServerSign0::start` refuse any other
+  setup with `Error::SetupMismatch`. Before, a client would use its stored `E` under whatever Paillier key
+  the given setup carried; the proof that `E` is well formed holds only for the key of its key generation,
+  and under another key the signing masks no longer hide the client's share. Pinning the setup hash already
+  prevented this; the library now enforces it itself.
+- **Migration.** Shares stored by 0.2.x and earlier (format 1) are still read, but they are not bound and
+  fail to sign with `Error::ShareNotBound`. Bind each one once with `bind_setup` and store it with `replace`:
+  on a server, to its own setup; on a client, to a setup whose hash the application pinned. In the FFI this
+  is `clientMigrateShare`, which accepts only a setup from `ClientSetup.verifyPinned` and rewrites the stored
+  share. A migrated or newly generated share cannot be read by 0.2.x.
+- New errors: `Error::SetupMismatch`, `Error::ShareNotBound`; in the FFI `TecdsaError.SetupMismatch`,
+  `ShareNotBound` and `SetupNotPinned`.
+- A setup can no longer be replaced under existing wallets: rotating the server setup needs a new key
+  generation.
+- Key generation rejects a joint key `X = X₁·X₂` equal to the identity, on both sides.
+- Documentation: the paper is ePrint 2024/1950 (the links pointed to 2025/1950); `SPEC.md` states
+  `ℓ0 = 32`; `AUDIT.md` lists the tough-prime sampling deviations.
+
 ## [0.2.0]
 
 **Wire format of key generation changes** (`KgMsg2`); signing and stored data are unchanged.
