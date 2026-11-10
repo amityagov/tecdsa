@@ -78,6 +78,10 @@ impl Ssid {
         Self::new(sid, server_id, client_id, SessionKind::Sign, tail)
     }
 
+    /// `sid`, the hash of the setup the session runs under.
+    pub fn sid(&self) -> [u8; 32] {
+        self.sid
+    }
     pub fn kind(&self) -> SessionKind {
         self.kind
     }

@@ -34,6 +34,7 @@ impl ServerSign0 {
         hd: Option<&HdPath>,
     ) -> Result<(ServerSign1, Vec<u8>)> {
         let params = *setup.params();
+        share.check_setup(setup)?;
         super::check_digest(digest)?;
         let x2 = *share.secret();
         let x2_pub = ProjectivePoint::GENERATOR * x2;

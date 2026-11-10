@@ -23,6 +23,10 @@ pub enum Error {
     Storage,
     #[error("a secret already exists under this name")]
     AlreadyExists,
+    #[error("the key share belongs to another setup")]
+    SetupMismatch,
+    #[error("the key share is not bound to a setup yet")]
+    ShareNotBound,
 }
 
 impl From<crate::rsa::tough::ToughError> for Error {

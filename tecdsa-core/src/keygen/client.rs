@@ -10,7 +10,7 @@ use super::{
     tx_base,
 };
 use crate::{
-    curve::{decode_point, encode_point, random_nonzero_scalar},
+    curve::{decode_point, encode_point, is_identity, random_nonzero_scalar},
     error::{Error, Result},
     messages::{KgMsg1, KgMsg2, KgMsg3},
     paillier::PaillierPk,
@@ -137,7 +137,11 @@ impl ClientKeygen1 {
             client: &self.client,
         };
         psi.verify(&tx_s, params, &stmt)?;
-        Ok(ClientKeyShare::new(self.x1, self.x1_pub + x2_pub, m.e))
+        let x_pub = self.x1_pub + x2_pub;
+        if is_identity(&x_pub) {
+            return Err(Error::VerificationFailed);
+        }
+        Ok(ClientKeyShare::new(self.x1, x_pub, m.e, self.ssid.sid()))
     }
 }
 

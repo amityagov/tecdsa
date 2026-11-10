@@ -66,6 +66,29 @@ the protocol inputs), and `vectors/reduced.json` (a deterministic regression).
 7. The 60 s keygen session timer is supplied through the `Clock` trait; the core is `no_std` and never reads
    the time itself.
 8. For the 112-bit profile the parameter T of the paper is not confirmed.
+9. **Tough-prime sampling** (`rsa/tough.rs`) differs from Algorithm 3 in three ways. Pool primes are drawn
+   from a narrow band (`qhi = qlo + qlo/64`) so that the product lands in the target interval, not
+   uniformly from all `2ℓ`-bit primes; each factor loses roughly 14 bits of entropy. For a prime
+   `≡ 7 (mod 8)` half of the pool is `≡ 3 (mod 4)`, which that residue class requires, while the paper's
+   `Prime₁` draws only primes `≡ 1 (mod 4)`. The random subset is chosen with `next_u32() % n`, which has
+   a negligible modulo bias. No practical impact is known.
+10. Both sides of key generation reject `X = X₁·X₂ = 1`. The paper does not state the check; the
+    commitment to `X₂` already makes the event negligible.
+
+## A key share is bound to its setup
+
+`E` is proven well formed (ψ_dlenc: it encrypts a small `x₂′`) only for the Paillier key of the setup used
+in its key generation. The noise on the client's `u` (`n_a = n_x + ε + n_b + ν`) is sized to cover `x₂′·v` for
+such an `E`. Under another Paillier key the same bytes decrypt to an unrelated full-size value, the noise no
+longer covers it, and the owner of that key could learn the client's share from one signing message. The
+paper fixes one setup per server and does not discuss this.
+
+Since 0.3.0 both shares store the setup hash, and `ClientSign::respond` and `ServerSign0::start` refuse a
+different setup before touching the secret (tests `share_is_bound_to_its_setup`,
+`old_share_must_be_bound_before_signing`). A share stored by an earlier version carries no hash and cannot
+say which setup it came from, so `bind_setup` trusts its caller once: the FFI allows it only for a setup
+created with `verify_pinned`. That one call is the remaining trust point; an application that pins a wrong
+hash at migration is not protected.
 
 ## The DF part of Π_sig is required for soundness
 

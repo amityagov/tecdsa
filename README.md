@@ -129,6 +129,9 @@ assert `benchServerEnabled() == false` at start-up.
 - Authenticating the server setup is the application's job. The crate returns a hash of `SetupData`;
   pin it in your app or have it signed by a long-term server key. In the Swift API use
   `ClientSetup.verifyPinned`, which checks that hash first; plain `verify` accepts any well-formed setup.
+- A key share works only with the setup it was generated under (since 0.3.0). Wallets stored by an earlier
+  version must be migrated once with `clientMigrateShare` (Swift) or `bind_setup` (Rust) before they can
+  sign; see [`CHANGELOG.md`](CHANGELOG.md).
 - Keeping the server's state between the two signing rounds is not implemented yet: `ServerSign1` lives in
   memory, so one signing session must stay on one process.
 - Fuzzing so far was short (40 s per target). A 24-hour run per target is still to do.

@@ -106,6 +106,68 @@ fn keygen_and_sign_through_ffi() {
         vk.verify_prehash(&d, &Signature::from_slice(&out.rs).unwrap())
             .unwrap();
     }
+    // Migration of a wallet stored before 0.3.0 (share format 1, no setup hash).
+    let key = "tecdsa/client-share/w1".to_string();
+    let bound = store.get(key.clone()).unwrap().unwrap();
+    assert_eq!(bound[0], 2);
+    let mut old = vec![1u8];
+    old.extend_from_slice(&bound[1..66]);
+    old.extend_from_slice(&bound[98..]);
+    store.put(key.clone(), old.clone()).unwrap();
+    let pinned_setup = ClientSetup::verify_pinned(
+        data.to_bytes().unwrap(),
+        data.hash().unwrap().to_vec(),
+        Profile::P128,
+    )
+    .unwrap();
+    let mut d = [0u8; 32];
+    rng.fill_bytes(&mut d);
+    let sign = |setup: &Arc<ClientSetup>, m1: Vec<u8>| {
+        client_sign(
+            setup.clone(),
+            store.clone(),
+            "w1".into(),
+            b"client".to_vec(),
+            d.to_vec(),
+            m1,
+            None,
+        )
+    };
+    let (st, m1) =
+        ServerSign0::start(&mut rng, &server_view, &server_share, b"client", &d, None).unwrap();
+    assert!(matches!(
+        sign(&pinned_setup, m1.clone()),
+        Err(TecdsaError::ShareNotBound)
+    ));
+    // Only a pinned setup may bind an old share; a refused call leaves the store untouched.
+    assert!(matches!(
+        client_migrate_share(setup.clone(), store.clone(), "w1".into()),
+        Err(TecdsaError::SetupNotPinned)
+    ));
+    assert_eq!(store.get(key.clone()).unwrap().unwrap(), old);
+    client_migrate_share(pinned_setup.clone(), store.clone(), "w1".into()).unwrap();
+    assert_eq!(store.get(key.clone()).unwrap().unwrap(), bound);
+    client_migrate_share(pinned_setup.clone(), store.clone(), "w1".into()).unwrap();
+    let m2 = sign(&pinned_setup, m1.clone()).unwrap();
+    st.finish(&server_view, sk.paillier_sk(), &m2).unwrap();
+    // The migrated wallet refuses the setup of another server key, pinned or not.
+    let (data_b, _) = server_setup(&mut rng, &p, [4u8; 32], b"server").unwrap();
+    let setup_b = ClientSetup::verify_pinned(
+        data_b.to_bytes().unwrap(),
+        data_b.hash().unwrap().to_vec(),
+        Profile::P128,
+    )
+    .unwrap();
+    assert!(matches!(
+        sign(&setup_b, m1),
+        Err(TecdsaError::SetupMismatch)
+    ));
+    assert!(matches!(
+        client_migrate_share(setup_b, store.clone(), "w1".into()),
+        Err(TecdsaError::SetupMismatch)
+    ));
+    assert_eq!(store.get(key).unwrap().unwrap(), bound);
+
     // HD: sign under a derived key through the FFI types
     let chain = [7u8; 32];
     let path = vec![44u32, 0, 0, 0, 3];

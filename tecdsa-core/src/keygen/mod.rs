@@ -15,6 +15,7 @@ use crate::{
     curve::{decode_point, decode_scalar, encode_point, encode_scalar},
     error::{Error, Result},
     params::Params,
+    setup::VerifiedSetup,
     ssid::Ssid,
     transcript::{Transcript, uint_from_be, uint_to_be},
     zk::df::DfStatement,
@@ -121,7 +122,20 @@ fn chain_code(x_pub: &ProjectivePoint, e: &[u8]) -> [u8; 32] {
     h.finalize().into()
 }
 
-const SHARE_VERSION: u8 = 0x01;
+/// Share format without a setup binding (0.2.x and earlier). Still read; never written for a
+/// bound share.
+const SHARE_VERSION_UNBOUND: u8 = 0x01;
+/// Share format that carries the hash of the setup the key was generated under.
+const SHARE_VERSION_BOUND: u8 = 0x02;
+
+/// `E ∈ Z*_{N²}` for the Paillier key of `setup`, with the exact encoded length.
+fn check_e_for_setup(e: &[u8], setup: &VerifiedSetup) -> Result<()> {
+    let pk = setup.paillier_pk();
+    let len = (2 * setup.params().n_rsa as usize).div_ceil(8);
+    let e_int = canonical_uint(e, len, pk.mod_n2().modulus().as_ref())?;
+    pk.check_ciphertext(&e_int)?;
+    Ok(())
+}
 
 macro_rules! key_share {
     ($name:ident, $field:ident, $doc:literal) => {
@@ -134,6 +148,10 @@ macro_rules! key_share {
             /// `E` as fixed-width big-endian (`⌈2·n_rsa/8⌉` bytes).
             #[zeroize(skip)]
             e: Vec<u8>,
+            /// Hash of the setup this share belongs to; `None` for a share stored before 0.3.0
+            /// that has not been bound yet.
+            #[zeroize(skip)]
+            setup_hash: Option<[u8; 32]>,
         }
 
         impl core::fmt::Debug for $name {
@@ -143,8 +161,18 @@ macro_rules! key_share {
         }
 
         impl $name {
-            pub(crate) fn new($field: Scalar, x_pub: ProjectivePoint, e: Vec<u8>) -> Self {
-                Self { $field, x_pub, e }
+            pub(crate) fn new(
+                $field: Scalar,
+                x_pub: ProjectivePoint,
+                e: Vec<u8>,
+                setup_hash: [u8; 32],
+            ) -> Self {
+                Self {
+                    $field,
+                    x_pub,
+                    e,
+                    setup_hash: Some(setup_hash),
+                }
             }
             /// Joint public key `X = X₁·X₂`.
             pub fn public_key(&self) -> &ProjectivePoint {
@@ -162,28 +190,87 @@ macro_rules! key_share {
             pub fn key_id(&self) -> [u8; 32] {
                 key_id(&self.x_pub, &self.e)
             }
+            /// Hash of the setup the share is bound to, or `None` for a share from before 0.3.0
+            /// that still needs [`Self::bind_setup`].
+            pub fn setup_hash(&self) -> Option<[u8; 32]> {
+                self.setup_hash
+            }
+            /// Refuses to use the share with any setup but its own. `E` was proven well formed
+            /// only for the Paillier key of the setup of its key generation; under another key
+            /// the signing masks no longer hide the client's values.
+            pub(crate) fn check_setup(&self, setup: &VerifiedSetup) -> Result<()> {
+                match self.setup_hash {
+                    None => Err(Error::ShareNotBound),
+                    Some(h) if h == setup.hash() => Ok(()),
+                    Some(_) => Err(Error::SetupMismatch),
+                }
+            }
+            /// One-time migration of a share stored before 0.3.0: binds it to `setup`.
+            ///
+            /// The share itself cannot tell which setup it came from, so the caller must be sure
+            /// that `setup` is the one the key was generated under: on a client, a setup whose
+            /// hash the application pinned; on a server, its own setup. Binding to another
+            /// party's setup gives that party what the binding is meant to protect.
+            ///
+            /// Binding again to the same setup is a no-op; a share bound to another setup is
+            /// refused with [`Error::SetupMismatch`]. Store the result with `replace`.
+            pub fn bind_setup(&mut self, setup: &VerifiedSetup) -> Result<()> {
+                match self.setup_hash {
+                    Some(h) if h == setup.hash() => Ok(()),
+                    Some(_) => Err(Error::SetupMismatch),
+                    None => {
+                        check_e_for_setup(&self.e, setup)?;
+                        self.setup_hash = Some(setup.hash());
+                        Ok(())
+                    }
+                }
+            }
             #[allow(dead_code)]
             pub(crate) fn secret(&self) -> &Scalar {
                 &self.$field
             }
-            /// Explicit export for a `SecretStore`: `version ‖ share(32) ‖ X(33) ‖ E`.
+            /// Explicit export for a `SecretStore`:
+            /// `0x02 ‖ share(32) ‖ X(33) ‖ setup hash(32) ‖ E`, or the old
+            /// `0x01 ‖ share(32) ‖ X(33) ‖ E` while the share is not bound.
             pub fn export_secret(&self) -> Zeroizing<Vec<u8>> {
-                let mut out = Zeroizing::new(Vec::with_capacity(1 + 32 + 33 + self.e.len()));
-                out.push(SHARE_VERSION);
+                let mut out = Zeroizing::new(Vec::with_capacity(1 + 32 + 33 + 32 + self.e.len()));
+                out.push(match self.setup_hash {
+                    Some(_) => SHARE_VERSION_BOUND,
+                    None => SHARE_VERSION_UNBOUND,
+                });
                 out.extend_from_slice(&encode_scalar(&self.$field));
                 out.extend_from_slice(&encode_point(&self.x_pub));
+                if let Some(h) = &self.setup_hash {
+                    out.extend_from_slice(h);
+                }
                 out.extend_from_slice(&self.e);
                 out
             }
+            /// Reads both formats. A share in the old format comes back unbound and cannot sign
+            /// until [`Self::bind_setup`] is called.
             pub fn import_secret(bytes: &[u8], params: &Params) -> Result<Self> {
                 let elen = (2 * params.n_rsa as usize).div_ceil(8);
-                if bytes.len() != 1 + 32 + 33 + elen || bytes[0] != SHARE_VERSION {
+                let hlen = match bytes.first() {
+                    Some(&SHARE_VERSION_UNBOUND) => 0,
+                    Some(&SHARE_VERSION_BOUND) => 32,
+                    _ => return Err(Error::InvalidEncoding),
+                };
+                if bytes.len() != 1 + 32 + 33 + hlen + elen {
                     return Err(Error::InvalidEncoding);
                 }
+                let setup_hash = match hlen {
+                    0 => None,
+                    _ => Some(
+                        bytes[66..98]
+                            .try_into()
+                            .map_err(|_| Error::InvalidEncoding)?,
+                    ),
+                };
                 Ok(Self {
                     $field: decode_scalar(&bytes[1..33])?,
                     x_pub: decode_point(&bytes[33..66])?,
-                    e: bytes[66..].to_vec(),
+                    e: bytes[66 + hlen..].to_vec(),
+                    setup_hash,
                 })
             }
         }

@@ -179,6 +179,7 @@ mod tests {
     use crate::hd::HdPath;
     use crate::{
         keygen::{ClientKeyShare, ServerKeyShare},
+        setup::VerifiedSetup,
         testutil::{fx, keygen, params},
     };
     use k256::ecdsa::VerifyingKey;
@@ -260,6 +261,116 @@ mod tests {
         let m2 = ClientSign::respond(&mut rng, &setup, &c, b"client-1", &d, &m1, None).unwrap();
         let (sig, _) = s1.finish(&server_view, fx().sk.paillier_sk(), &m2).unwrap();
         vk.verify_prehash(&d, &sig.to_ecdsa().unwrap()).unwrap();
+    }
+
+    /// The pre-0.3.0 encoding of a share: version 1, no setup hash.
+    fn as_v1(bound: &[u8]) -> Vec<u8> {
+        assert_eq!(bound[0], 2);
+        let mut v = std::vec![1u8];
+        v.extend_from_slice(&bound[1..66]);
+        v.extend_from_slice(&bound[98..]);
+        v
+    }
+
+    /// A second, well-formed setup of another server key (same `server_id`, same parameters).
+    fn other_setup() -> (VerifiedSetup, VerifiedSetup) {
+        use crate::setup::server_setup_with;
+        let mut rng = ChaCha8Rng::seed_from_u64(77);
+        let (data, _) =
+            server_setup_with(&mut rng, &params(), &fx().fac, [8u8; 32], b"server-A").unwrap();
+        (
+            data.verify_with(&params(), &fx().fac).unwrap(),
+            data.assume_verified(&params()).unwrap(),
+        )
+    }
+
+    #[test]
+    fn share_is_bound_to_its_setup() {
+        let (c, s) = keygen(31);
+        assert_eq!(c.setup_hash(), Some(fx().setup.hash()));
+        assert_eq!(s.setup_hash(), Some(fx().setup.hash()));
+        // The binding survives export / import.
+        let c = ClientKeyShare::import_secret(&c.export_secret(), &params()).unwrap();
+        let s = ServerKeyShare::import_secret(&s.export_secret(), &params()).unwrap();
+        assert_eq!(c.setup_hash(), Some(fx().setup.hash()));
+
+        let (other_client, other_server) = other_setup();
+        let mut rng = ChaCha8Rng::seed_from_u64(31);
+        let d = digest(&mut rng);
+        // A valid first message of the real server: the client still refuses the foreign setup.
+        let (_, m1) =
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d, None).unwrap();
+        assert_eq!(
+            ClientSign::respond(&mut rng, &other_client, &c, b"client-1", &d, &m1, None)
+                .unwrap_err(),
+            Error::SetupMismatch
+        );
+        assert_eq!(
+            ServerSign0::start(&mut rng, &other_server, &s, b"client-1", &d, None)
+                .err()
+                .unwrap(),
+            Error::SetupMismatch
+        );
+        // Re-binding to another setup is refused and changes nothing.
+        let mut c = c;
+        assert_eq!(
+            c.bind_setup(&other_client).unwrap_err(),
+            Error::SetupMismatch
+        );
+        assert_eq!(c.setup_hash(), Some(fx().setup.hash()));
+        c.bind_setup(&fx().setup).unwrap();
+        sign_once(&mut rng, &c, &s, &d);
+    }
+
+    #[test]
+    fn old_share_must_be_bound_before_signing() {
+        let (c, s) = keygen(32);
+        let (c_new, s_new) = (c.export_secret(), s.export_secret());
+        let mut c = ClientKeyShare::import_secret(&as_v1(&c_new), &params()).unwrap();
+        let mut s = ServerKeyShare::import_secret(&as_v1(&s_new), &params()).unwrap();
+        assert_eq!(c.setup_hash(), None);
+        // An unbound share is written back in the old format, unchanged.
+        assert_eq!(c.export_secret().as_slice(), as_v1(&c_new).as_slice());
+
+        let mut rng = ChaCha8Rng::seed_from_u64(32);
+        let d = digest(&mut rng);
+        assert_eq!(
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d, None)
+                .err()
+                .unwrap(),
+            Error::ShareNotBound
+        );
+        s.bind_setup(&fx().server_view).unwrap();
+        let (s1, m1) =
+            ServerSign0::start(&mut rng, &fx().server_view, &s, b"client-1", &d, None).unwrap();
+        assert_eq!(
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &m1, None).unwrap_err(),
+            Error::ShareNotBound
+        );
+        c.bind_setup(&fx().setup).unwrap();
+        // Bound shares are written in the new format and equal the ones keygen produces now.
+        assert_eq!(c.export_secret().as_slice(), c_new.as_slice());
+        assert_eq!(s.export_secret().as_slice(), s_new.as_slice());
+        let m2 =
+            ClientSign::respond(&mut rng, &fx().setup, &c, b"client-1", &d, &m1, None).unwrap();
+        s1.finish(&fx().server_view, fx().sk.paillier_sk(), &m2)
+            .unwrap();
+    }
+
+    #[test]
+    fn share_encodings_are_strict() {
+        let (c, _) = keygen(33);
+        let bound = c.export_secret().to_vec();
+        let old = as_v1(&bound);
+        let p = params();
+        // A version byte that does not match the length, and unknown versions.
+        for (bytes, version) in [(&bound, 1u8), (&old, 2), (&bound, 0), (&bound, 3)] {
+            let mut bad = bytes.clone();
+            bad[0] = version;
+            assert!(ClientKeyShare::import_secret(&bad, &p).is_err());
+        }
+        assert!(ClientKeyShare::import_secret(&[], &p).is_err());
+        assert!(ClientKeyShare::import_secret(&bound[..bound.len() - 1], &p).is_err());
     }
 
     #[test]

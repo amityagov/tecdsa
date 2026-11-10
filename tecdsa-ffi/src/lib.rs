@@ -51,6 +51,12 @@ pub enum TecdsaError {
     AlreadyExists,
     #[error("session already used")]
     SessionConsumed,
+    #[error("the wallet belongs to another server setup")]
+    SetupMismatch,
+    #[error("the wallet must be migrated with client_migrate_share first")]
+    ShareNotBound,
+    #[error("this call needs a setup created with verify_pinned")]
+    SetupNotPinned,
     #[error("internal error")]
     Internal,
 }
@@ -63,6 +69,8 @@ impl From<CoreError> for TecdsaError {
             CoreError::NotFound => Self::NotFound,
             CoreError::Storage => Self::Storage,
             CoreError::AlreadyExists => Self::AlreadyExists,
+            CoreError::SetupMismatch => Self::SetupMismatch,
+            CoreError::ShareNotBound => Self::ShareNotBound,
             CoreError::InvalidEncoding | CoreError::OutOfRange | CoreError::InvalidModulus => {
                 Self::InvalidInput
             }
@@ -135,6 +143,8 @@ fn digest32(d: &[u8]) -> Result<[u8; 32], TecdsaError> {
 pub struct ClientSetup {
     inner: VerifiedSetup,
     profile: Profile,
+    /// Created by `verify_pinned`: the application vouched for this exact setup.
+    pinned: bool,
 }
 
 #[uniffi::export]
@@ -145,7 +155,11 @@ impl ClientSetup {
         let p = params(profile);
         let data = SetupData::from_bytes(&setup_bytes, &p)?;
         let inner = data.verify(&p)?.with_tables();
-        Ok(Arc::new(Self { inner, profile }))
+        Ok(Arc::new(Self {
+            inner,
+            profile,
+            pinned: false,
+        }))
     }
 
     /// Like `verify`, but first checks that the setup is the one the application pinned
@@ -163,7 +177,11 @@ impl ClientSetup {
             return Err(TecdsaError::Verification);
         }
         let inner = data.verify(&p)?.with_tables();
-        Ok(Arc::new(Self { inner, profile }))
+        Ok(Arc::new(Self {
+            inner,
+            profile,
+            pinned: true,
+        }))
     }
 
     /// SHA-256 of the setup; pin it to detect server changes.
@@ -246,6 +264,35 @@ fn load_share(
         wallet_id,
         &params(profile),
     )?)
+}
+
+/// One-time migration of a wallet created before 0.3.0.
+///
+/// Since 0.3.0 a stored share names the server setup it was generated under, and signing refuses
+/// any other setup. A share stored by an earlier version has no such record and fails to sign
+/// with `ShareNotBound` until this call binds it to `setup` and rewrites it in the store.
+///
+/// The share cannot tell which setup it came from, so `setup` must come from `verify_pinned`,
+/// with a hash the application trusts for this wallet; a setup from plain `verify` is refused
+/// with `SetupNotPinned`. Calling it again for a migrated wallet does nothing; a wallet bound to
+/// another setup fails with `SetupMismatch`.
+#[uniffi::export]
+pub fn client_migrate_share(
+    setup: Arc<ClientSetup>,
+    store: Arc<dyn SecretStore>,
+    wallet_id: String,
+) -> Result<(), TecdsaError> {
+    if !setup.pinned {
+        return Err(TecdsaError::SetupNotPinned);
+    }
+    let mut share = load_share(store.clone(), &wallet_id, setup.profile)?;
+    if share.setup_hash().is_some() {
+        // Already bound: only confirm it is this setup, and leave the store alone.
+        return Ok(share.bind_setup(&setup.inner)?);
+    }
+    share.bind_setup(&setup.inner)?;
+    share.replace(&StoreAdapter(store), &wallet_id)?;
+    Ok(())
 }
 
 /// Public key (33 bytes, compressed) of a stored wallet.

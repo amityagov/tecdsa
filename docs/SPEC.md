@@ -154,7 +154,7 @@ collected in `struct Params` and checked by `const` assertions. There are no mag
 | ν\_leak | noise against subgroup leakage | 64 | 64 |
 | r\_mod | Π\_mod repetitions (ℓ/2) | 64 | 56 |
 | r\_df | Π\_df repetitions | 128 | 112 |
-| r\_df\* / ℓ₀ | Π\_df\* repetitions / challenge size | 16 / see open question | 16 / see open question |
+| r\_df\* / ℓ₀ | Π\_df\* repetitions / challenge size | 16 / 32 | 16 / 32 |
 | n\_x = κ + ν\_leak | range of x₂′ | 320 | 320 |
 | n\_λ = 2ℓ + ν\_leak | range of β | 320 | 288 |
 | n\_b = κ + ℓ + ν | range of v | 448 | 432 |
@@ -165,9 +165,9 @@ collected in `struct Params` and checked by `const` assertions. There are no mag
 | d (Π\_fac) | public strong prime | 2³⁴⁵⁹ + 1169115 | same |
 
 **Open question on ℓ₀.** In section 8.1 of the paper ℓ₀ = 32, while in sections 6.2–6.3 ℓ₀ = ⌈ℓ / r\_df\*⌉ = 8.
-The value determines the size of Π\_df\* and the soundness loss (guessing ω < 2^ℓ₀). The default is
-ℓ₀ = 8 with r\_df\* = 16, which gives 128 bits of soundness and matches the proof. The question to the
-authors is still open.
+The value determines the size of Π\_df\* and the soundness loss (guessing ω < 2^ℓ₀). Since 0.2.0 the
+value is ℓ₀ = 32 with r\_df\* = 16, as section 8.1 assumes; versions up to 0.1.3 used ℓ₀ = 8 (see
+`AUDIT.md`, deviation 1). The question to the authors is still open.
 
 **The constant d.** It is hard-coded as bytes. A test checks that d and (d−1)/2 are prime. The
 generators g, h of QR\_d are derived deterministically from `aux` through the transcript.
@@ -332,6 +332,9 @@ budgets below leave headroom. Measured results are in [`BENCHMARKS.md`](BENCHMAR
 - **Secrets:** every secret type is `ZeroizeOnDrop`, without `Clone`; `Debug` prints `***` (the Montgomery
   parameters of the secret moduli and some temporaries cannot be wiped, see `AUDIT.md`, "Known limitations"). Secrets are
   serialized only through an explicit `export_secret()` for `SecretStore`.
+- **Shares belong to one setup:** a stored share carries the hash of its setup
+  (`0x02 ‖ share(32) ‖ X(33) ‖ sid(32) ‖ E`), and signing refuses any other setup. The format without the hash
+  (`0x01 ‖ share ‖ X ‖ E`, before 0.3.0) is read but must be bound once with `bind_setup` before it can sign.
 - **No panics** in `tecdsa-core`: `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
   Every error is returned through `Result`.
 - **Input validation:** every deserialized point is checked to be on the curve and not the identity,

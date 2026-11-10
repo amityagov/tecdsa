@@ -57,6 +57,8 @@ impl ClientSign {
         hd: Option<&HdPath>,
     ) -> Result<Vec<u8>> {
         let params = setup.params();
+        // Before anything touches `x₁`: the share must belong to this setup.
+        share.check_setup(setup)?;
         super::check_digest(digest)?;
         let m1 = SignMsg1::decode(msg1, params)?;
         let r2 = decode_point(&m1.r2)?;

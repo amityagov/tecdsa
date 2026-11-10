@@ -7,8 +7,8 @@ use zeroize::ZeroizeOnDrop;
 use super::{ServerKeyShare, commitment, decode_client_tuple, tx_base};
 use crate::{
     arith::sbig::{SBig, SRange},
-    curve::{decode_point, encode_point, sbig_to_scalar},
-    error::Result,
+    curve::{decode_point, encode_point, is_identity, sbig_to_scalar},
+    error::{Error, Result},
     messages::{KgMsg1, KgMsg2, KgMsg3},
     paillier::PaillierPk,
     params::Params,
@@ -89,6 +89,10 @@ impl ServerKeygen1 {
         let tx_c = tx_base(params, &self.ssid, "C");
         psi_df.verify(&tx_c, params, &client)?;
         psi_dlog.verify(&tx_c, params, &x1_pub)?;
+        let x_pub = x1_pub + self.x2_pub;
+        if is_identity(&x_pub) {
+            return Err(Error::VerificationFailed);
+        }
 
         let beta = SBig::random_in(rng, SRange::pm_pow2(params.n_lambda()));
         let e_ct = self.pk.enc(&self.x2p, &beta, params.n_lambda())?;
@@ -115,7 +119,8 @@ impl ServerKeygen1 {
             psi_dlenc: psi.encode(params)?,
         }
         .encode(params)?;
-        let share = ServerKeyShare::new(sbig_to_scalar(&self.x2p)?, x1_pub + self.x2_pub, e_bytes);
+        let share =
+            ServerKeyShare::new(sbig_to_scalar(&self.x2p)?, x_pub, e_bytes, self.ssid.sid());
         Ok((share, msg3))
     }
 }

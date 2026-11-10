@@ -622,9 +622,8 @@ pub fn sample_df<R: CryptoRng + ?Sized>(
     )
 }
 
-/// `SampleDF` for the client's ephemeral tuple (`params.n_client` bits). Tough primes of
-/// the server profile do not fit into 1024-bit primes, so safe primes are used.
-// TODO(spec §5/§6.2): confirm the client's prime structure with the paper.
+/// `SampleDF` for the client's ephemeral tuple (`params.n_client` bits), with tough primes
+/// sized for the client modulus.
 pub fn sample_df_client<R: CryptoRng + ?Sized>(
     rng: &mut R,
     params: &Params,
