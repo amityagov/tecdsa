@@ -9,8 +9,8 @@
 and sign together, in **two rounds** and about **2 KB** of traffic. The private key never exists in one
 place. The signature is an ordinary ECDSA signature that any Bitcoin or Ethereum verifier accepts.
 
-It implements [*Two-Round 2PC ECDSA at the Cost of 1 OLE*](https://eprint.iacr.org/2025/1950)
-(Adjedj, Blokh, Couteau, Galansky, Joux, Makriyannis; ePrint 2025/1950).
+It implements [*Two-Round 2PC ECDSA at the Cost of 1 OLE*](https://eprint.iacr.org/2024/1950)
+(Adjedj, Blokh, Couteau, Galansky, Joux, Makriyannis; ePrint 2024/1950).
 
 > **Status: not audited.** This is a research-grade implementation of a recent protocol. It has not
 > been reviewed by an external party. Do not protect real funds with it before an independent audit.

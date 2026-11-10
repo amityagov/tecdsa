@@ -1,7 +1,7 @@
 # Notes for an external audit
 
 The `tecdsa-core` crate implements *Two-Round 2PC ECDSA at the Cost of 1 OLE* (Adjedj et al.,
-[ePrint 2025/1950](https://eprint.iacr.org/2025/1950)) on secp256k1. The design is in
+[ePrint 2024/1950](https://eprint.iacr.org/2024/1950)) on secp256k1. The design is in
 [`SPEC.md`](SPEC.md). This note is a map for a reviewer, not a statement about security: **the code has
 not been externally audited.**
 
