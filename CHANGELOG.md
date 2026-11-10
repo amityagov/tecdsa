@@ -51,7 +51,7 @@ No change to the protocols or the wire format.
 
 ## [0.1.0]
 
-First release. Implements *Two-Round 2PC ECDSA at the Cost of 1 OLE* (ePrint 2025/1950) on secp256k1.
+First release. Implements *Two-Round 2PC ECDSA at the Cost of 1 OLE* (ePrint 2024/1950) on secp256k1.
 
 - Server setup with Π_mod, Π_fac and Π_df proofs; client verification of the setup.
 - Key generation (three messages) and signing (two rounds plus an optional third message).

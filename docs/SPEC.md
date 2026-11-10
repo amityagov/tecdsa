@@ -1,7 +1,7 @@
 # Design specification
 
 Two-party ECDSA on secp256k1 in pure Rust, after Adjedj, Blokh, Couteau, Galansky, Joux and
-Makriyannis, *Two-Round 2PC ECDSA at the Cost of 1 OLE* ([ePrint 2025/1950](https://eprint.iacr.org/2025/1950),
+Makriyannis, *Two-Round 2PC ECDSA at the Cost of 1 OLE* ([ePrint 2024/1950](https://eprint.iacr.org/2024/1950),
 version of 6 March 2026). This document records what `tecdsa-1ole` implements, the parameters it
 uses and the encodings it puts on the wire. Source comments refer to its sections as `spec §N`.
 
@@ -468,7 +468,7 @@ The figures are a guide. If SignMsg2 exceeds 2048 bytes, check the compact form 
 ## Sources
 
 - Adjedj, Blokh, Couteau, Galansky, Joux, Makriyannis. *Two-Round 2PC ECDSA at the Cost of 1 OLE* (version of
-  6 March 2026), <https://eprint.iacr.org/2025/1950>.
+  6 March 2026), <https://eprint.iacr.org/2024/1950>.
 - [crypto-bigint v0.7.0 release notes](https://github.com/RustCrypto/crypto-bigint/releases/tag/v0.7.0)
 - [crypto-bigint documentation](https://docs.rs/crypto-bigint/)
 - [crypto-primes documentation](https://docs.rs/crypto-primes/)
